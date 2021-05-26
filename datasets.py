@@ -3,8 +3,7 @@ import json
 from glob import glob
 import copy
 import torch
-from typing import Dict
-from collections.abc import Sequence
+from typing import Dict, Sequence
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import default_collate
 import torchio as tio
@@ -47,9 +46,6 @@ class ImageDefinition(dict):
         self.update(kwargs)
 
 
-# TODO:
-#   Remove input_images and target_label parameters? They are very specific to segmentation,
-#   this class could be more general if this was moved to something else (i.e. the trainer)
 class SubjectFolder(Dataset):
     """ A PyTorch Dataset for 3D medical data.
 
@@ -60,10 +56,11 @@ class SubjectFolder(Dataset):
 
     Args:
         path: Path to the root of the subject folder dataset.
-        input_images: Names of the images to be used as the input to a model.
-        target_label: Target label map that we want the model to output.
         image_defintions: Defines the images in each subject folder to be loaded as a tio.ScalarImage
         label_definitions: Defines the label maps in each subject folder to be loaded as a tio.LabelMap
+        collate_images: Images that are grouped on the channel dimension and stored as a tensor when this subject is
+            loaded. These tensors are stacked in collate() into (N, C, H, W, D) tensors.
+        collate_labels: Labels to be
         transforms: A tio.Transform that is applied to all loaded images and label maps
         require_images: If true, a subject wont be added to the dataset if they are missing any images defined in
             image_definitions or label_definitions.
@@ -77,10 +74,10 @@ class SubjectFolder(Dataset):
     def __init__(
             self,
             path: str,
-            input_images: Sequence[str],
-            target_label: str,
             image_definitions: Sequence[ImageDefinition],
             label_definitions: Sequence[ImageDefinition],
+            collate_images: Dict[str, Sequence[str]] = None,
+            collate_labels: Dict[str, str] = None,
             transforms: tio.Transform = None,
             require_images: bool = False,
             include_subjects: Sequence[str] = None,
@@ -89,10 +86,10 @@ class SubjectFolder(Dataset):
             exclude_attributes: Dict = None
     ):
         self.path = path
-        self.input_images = input_images
-        self.target_label = target_label
         self.image_definitions = image_definitions
         self.label_definitions = label_definitions
+        self.collate_images = collate_images
+        self.collate_labels = collate_labels
         self.require_images = require_images
         self.transforms = transforms
         self.include_subjects = include_subjects
@@ -210,10 +207,14 @@ class SubjectFolder(Dataset):
         if self.transforms is not None:
             subject = self.transforms(subject)
 
-        # TODO: Segmentation specific. Move to SegmentationTrainer?
-        images = [subject[image_name].data for image_name in self.input_images]
-        subject["X"] = torch.cat(images)
-        subject["y"] = subject[self.target_label].data if self.target_label else None
+        # Concatenate (c, W, H, D) images on channel axis to (C, W, H, D) tensors
+        for collate_image_key, collate_image_names in self.collate_images.items():
+            collate_images = [subject[image_name].data for image_name in collate_image_names]
+            subject[collate_image_key] = torch.cat(collate_images)
+
+        # Get label data as a (1, W, H, D) tensor
+        for collate_label_key, collate_label_name in self.collate_labels.items():
+            subject[collate_label_key] = subject[collate_label_name].data
 
         return subject
 
@@ -231,9 +232,21 @@ class SubjectFolder(Dataset):
         for subject in self.subjects:
             subject.load()
 
-    # TODO: Segmentation specific. Move to SegmentationTrainer?
-    @staticmethod
-    def collate(batch):
-        X = torch.stack([subject["X"] for subject in batch])
-        y = torch.cat([subject["y"] for subject in batch])
-        return X, y, batch
+    def collate(self, batch: Sequence[tio.Subject]):
+        out_dict = {}
+
+        # Stack the (C, W, H, D) images into a (N, C, W, H, D) image i.e. this adds the batch dimension
+        for collate_image_key, collate_image_names in self.collate_images.items():
+            out_dict[collate_image_key] = torch.stack([subject[collate_image_key] for subject in batch])
+
+        # Stack the (1, W, H, D) labels into a (N, W, H, D) label
+        # TODO: Switch or add support for multi-channel (N, C, W, H, D) labels. This could be useful for nested labels.
+        for collate_label_key in self.collate_labels.keys():
+            out_dict[collate_label_key] = torch.cat([subject[collate_image_key].data for subject in batch])
+
+        return out_dict
+
+    def load_and_collate_all_subjects(self):
+        all_subjects_loaded = [self[i] for i in range(len(self))]
+        all_subjects_collated = self.collate(all_subjects_loaded)
+        return all_subjects_collated

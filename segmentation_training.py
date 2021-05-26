@@ -1,8 +1,42 @@
-import os
-from collections.abc import Sequence
-import torch
-import torchio as tio
+from typing import Sequence
 import time
+import warnings
+
+import torch
+import numpy as np
+from torch import nn
+import torch.nn.functional as F
+import torchio as tio
+import os
+import signal
+import threading
+
+from torchvision.utils import make_grid
+
+from PIL import Image
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.cm import get_cmap
+import io
+
+import wandb
+
+from evaluation import dice_validation
+
+EXIT = threading.Event()
+EXIT.clear()
+
+
+def _clean_exit_handler(signum, frame):
+    EXIT.set()
+    print("Exiting cleanly", flush=True)
+
+
+signal.signal(signal.SIGINT, _clean_exit_handler)
+signal.signal(signal.SIGTERM, _clean_exit_handler)
+if os.name != 'nt':
+    signal.signal(signal.SIGUSR2, _clean_exit_handler)
 
 
 def transform_label_names(subject, label_map, label_names):
@@ -23,63 +57,23 @@ def transform_label_names(subject, label_map, label_names):
     return label_names
 
 
-class CudaTimer:
-    def __init__(self):
-        self.start()
-
-    def start(self):
-        self.start_time = time.time()
-        self.last_time = self.start_time
-        self.timestamps = {}
-
-    def stamp(self, name=None, from_start=False):
-        torch.cuda.current_stream().synchronize()
-        new_time = time.time()
-        if not from_start:
-            dt = new_time - self.last_time
-        else:
-            dt = time.time() - self.start_time
-        self.last_time = new_time
-        if name:
-            self.timestamps[name] = dt
-        return dt
-
-
 class SegmentationTrainer:
     def __init__(
             self,
-            input_images: Sequence[str],
-            target_label: str,
             save_folder: str,
             sample_rate,
             save_rate,
             val_datasets,
             val_images,
-            preload_training_dataset=False
     ):
-        self.input_images = input_images
-        self.target_label = target_label
         self.save_folder = save_folder
         self.sample_rate = sample_rate
         self.save_rate = save_rate
         self.val_datasets = val_datasets
         self.val_images = val_images
-        self.preload_training_dataset = preload_training_dataset
 
-    # Given a list of tio.Subjects, returns (X, y) where X is the input_images, y is the target_label
-    # X is a FloatTensor shape (N, C, H, W, D), while y is a LongTensor shape (N, H, W, D)
-    def collate_subjects(self, batch: Sequence[tio.Subject]) -> (torch.FloatTensor, torch.LongTensor):
-        X = []
-        y = []
-        for subject in batch:
-            images = [subject[image_name].data for image_name in self.input_images]
-            X.append(torch.cat(images))
-            y.append(subject[self.target_label])
-        X = torch.stack(X)
-        y = torch.cat(y)
-        return X, y
-
-    def train(self, context, iterations, stop_time=None, wandb_logging=False):
+    def train(self, context, iterations, stop_time=None, wandb_logging=False,
+              preload_training_dataset=False, preload_validation_datasets=False):
 
         save_folder = f'{self.save_folder}/{context.name}/'
         image_folder = save_folder + "images/"
@@ -87,32 +81,29 @@ class SegmentationTrainer:
             if not os.path.exists(folder):
                 os.makedirs(folder)
 
-        if self.preload_training_dataset:
-            print("Preloading training data.")
-            context.dataset.preload_subjects()
-
         def save_context():
             context.save(f"{save_folder}/iter{context.iteration:08}.pt")
 
         def sample_data(loader):
             while True:
                 for batch in loader:
-                    yield self.collate_subjects(batch)
+                    yield batch
 
-        print("Preloading validation data.")
-        for val_dataset in self.val_datasets:
-            if val_dataset["preload"]:
-                val_dataset["X"], val_dataset["y"] = self.collate_subjects(
-                    [val_dataset["dataset"][i] for i in range(len(val_dataset["dataset"]))]
-                )
-        print("Preload finished.")
+        if preload_training_dataset:
+            print("Preloading training data.")
+            context.dataset.preload_subjects()
+
+        if preload_validation_datasets:
+            print("Preloading validation data.")
+            for val_dataset in self.val_datasets:
+                if val_dataset["preload"]:
+                    val_dataset.update(val_dataset['dataset'].load_and_collate_all_subjects())
+            print("Preload finished.")
 
         loader = sample_data(context.dataloader)
 
         subject = context.dataset[0]
-
-        target_label_name = context.dataset.target_label
-        target_label = subject[target_label_name]
+        target_label = subject[self.target_label]
         label_names = target_label["label_names"]
         label_names_transformed = transform_label_names(subject, target_label, label_names)
         label_names_inverse = {name: i for name, i in label_names.items() if name in label_names_transformed}
@@ -120,9 +111,9 @@ class SegmentationTrainer:
         for t in subject.history:
             if type(t) not in (tio.RemapLabels, tio.RemoveLabels, tio.SequentialLabels):
                 continue
-            if t.include and target_label_name not in t.include:
+            if t.include and self.target_label not in t.include:
                 continue
-            if t.exclude and target_label_name in t.exclude:
+            if t.exclude and self.target_label in t.exclude:
                 continue
             label_transforms.append(t)
         _inverse_label_transform = tio.Compose(label_transforms).inverse(warn=False)
@@ -137,15 +128,15 @@ class SegmentationTrainer:
             timer.start()
 
             batch = next(loader)
-            X, y, subjects = batch
+            X, y = batch['X'], batch['y']
             X = X.to(context.device)
             y = y.to(context.device)
-
             timer.stamp("Time: Data Loading")
 
             context.model.train()
             y_pred = context.model(X)
             timer.stamp("Time: Model Forward")
+
             loss = context.criterion(y_pred, y)
             loss_dict = {"loss": loss.item()}
             if isinstance(loss, tuple):
@@ -166,6 +157,8 @@ class SegmentationTrainer:
             train_dice_results = dice_validation(y_pred, y, label_names_inverse, "Training")
             timer.stamp("Time: Train Dice")
 
+            # A cache in order to avoid predicting validation subjects more than once per iteration
+            # Maps subject_name -> (X, y, y_pred)
             cache = {}
             def predict(subject=None, subjects=None, X=None, y=None):
                 if X is None or y is None:
@@ -173,7 +166,7 @@ class SegmentationTrainer:
                         if subject.name in cache:
                             return cache[subject.name]
                         subjects = [subject]
-                    X, y, _ = SubjectFolder.collate(subjects)
+                    X, y = self.collate_subjects(subjects)
                 X = X.to(context.device)
                 y = y.to(context.device)
                 with torch.no_grad():

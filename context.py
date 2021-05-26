@@ -1,16 +1,6 @@
 import torch
 from datetime import datetime
 
-context_globals = {}
-
-
-# ct is short for "context target"
-# This is used when one component in a context needs a reference to another context component as a parameter
-# Should deprecate this and specify targets with strings and a special prefix instead
-class ct:
-    def __init__(self, tname):
-        self.tname = tname
-
 
 # Holds all components for a pytorch experiment
 # Handles initialization and serialization in a convenient way
@@ -90,9 +80,9 @@ class Context:
             return tuple(self._fix_params(param) for param in params)
 
         param = params
-        if isinstance(param, ct):
-            return eval("self." + param.tname)
         if isinstance(param, str):
+            if param.startswith("self."):
+                return eval(param)
             for variable, value in self.variables.items():
                 if not isinstance(value, str):
                     continue
@@ -102,10 +92,7 @@ class Context:
 
     def _init_part(self, part):
         name = part["name"]
-        if self.globals is None:
-            constructor = context_globals[part["constructor"]]
-        else:
-            constructor = self.globals[part["constructor"]]
+        constructor = self.globals[part["constructor"]]
         params = self._fix_params(part["params"])
 
         if "optimize_target" in part:

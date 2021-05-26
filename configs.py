@@ -1,13 +1,15 @@
-from context2 import Context2, ct
+from context import Context
 import torchio as tio
-from datasets import SubjectFolder, ImageDefinition, subject_collate
-from seg_new import NestedResUNet, HybridLogisticDiceLoss, SegTrainer
+from datasets import SubjectFolder, ImageDefinition
+from segmentation_training import SegmentationTrainer
+from models import NestedResUNet
+from evaluation import HybridLogisticDiceLoss
 from torch.utils.data import DataLoader, RandomSampler
 from torch.optim import Adam
 
 
 def get_context(config_name, device, variables, **kwargs):
-    context = Context2(device, name=config_name, variables=variables, globals=globals())
+    context = Context(device, name=config_name, variables=variables, globals=globals())
 
     if config_name == "dmri-hippo":
         image_definitions = [
@@ -48,8 +50,7 @@ def get_context(config_name, device, variables, **kwargs):
             32, 42, 55, 67, 82, 88, 96, 98, 102, 107, 110, 117, 123, 143, 145, 149, 173, 182, 184, 401
         )]
         dataset_params = dict(path="$DATASET_PATH", image_definitions=image_definitions,
-                              label_definitions=label_definitions, require_images=True,
-                              input_images=["mean_dwi", "md", "fa"], target_label="whole_roi")
+                              label_definitions=label_definitions, require_images=True)
 
         context.add_part("dataset", SubjectFolder, exclude_subjects=cbbrain_val_subjects,
                          transforms=transforms, include_attributes=dict(protocol="cbbrain"), **dataset_params)
@@ -62,14 +63,15 @@ def get_context(config_name, device, variables, **kwargs):
 
         context.add_part("datasampler", RandomSampler, data_source=ct("dataset"))
         context.add_part("dataloader", DataLoader, dataset=ct("dataset"), batch_size=4, sampler=ct("datasampler"),
-                         drop_last=False, collate_fn=SubjectFolder.collate, pin_memory=False, num_workers=10,
+                         drop_last=False, collate_fn=None, pin_memory=False, num_workers=10,
                          persistent_workers=True)
         context.add_part("model", NestedResUNet, input_channels=3, output_channels=2, filters=40, dropout_p=0.2,
                          saggital_split=True)
         context.add_part("optimizer", Adam, params=ct("model.parameters()"), lr=0.0002)
         context.add_part("criterion", HybridLogisticDiceLoss)
-        context.add_part("trainer", SegTrainer, save_folder="$CHECKPOINTS_PATH", sample_rate=50, save_rate=1000,
-                         preload_training_dataset=True,
+        context.add_part("trainer", SegmentationTrainer,
+                         input_images=["mean_dwi", "md", "fa"], target_label="whole_roi",
+                         save_folder="$CHECKPOINTS_PATH", sample_rate=50, save_rate=1000,
                          val_datasets=[
                              dict(dataset=ct("val_cbbrain"), log_prefix="Cb Val", preload=True, interval=50),
                              dict(dataset=ct("val_ab300"), log_prefix="Ab Val", preload=True, interval=50),
@@ -137,7 +139,7 @@ def get_context(config_name, device, variables, **kwargs):
                          saggital_split=False)
         context.add_part("optimizer", Adam, params=ct("model.parameters()"), lr=0.0002)
         context.add_part("criterion", HybridLogisticDiceLoss)
-        context.add_part("trainer", SegTrainer, save_folder="$CHECKPOINTS_PATH", sample_rate=50, save_rate=250,
+        context.add_part("trainer", SegmentationTrainer, save_folder="$CHECKPOINTS_PATH", sample_rate=50, save_rate=250,
                          preload_training_dataset=True,
                          val_datasets=[
                              dict(dataset=ct("val_dataset"), log_prefix="Val", preload=True, interval=50),

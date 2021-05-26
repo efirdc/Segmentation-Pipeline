@@ -119,6 +119,9 @@ if __name__ == "__main__":
         wandb_params["resume"] = "allow"
     else:
         wandb_params["id"] = context.info["wandb_id"] = wandb.util.generate_id()
+    wandb.init(project=args.wandb_project, **wandb_params)
+
+    '''
     for i in range(100):
         try:
             wandb.init(project=args.wandb_project, **wandb_params)
@@ -127,6 +130,8 @@ if __name__ == "__main__":
             print(f"wandb init failed. retrying...")
             time.sleep(10)
         raise TimeoutError("max wandb init attempts reached.")
+    '''
+
     if not context.name.endswith(wandb.run.name):
         print(f"Appending wandb run name to context name.")
         context.name += '-' + wandb.run.name
