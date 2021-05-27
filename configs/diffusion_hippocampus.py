@@ -65,8 +65,8 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
 
     context.add_part("datasampler", RandomSampler, data_source="self.dataset")
     context.add_part("dataloader", DataLoader, dataset="self.dataset", batch_size=4, sampler="self.datasampler",
-                     drop_last=False, collate_fn="self.dataset.collate", pin_memory=False, num_workers=1,
-                     persistent_workers=True)
+                     drop_last=False, collate_fn="self.dataset.collate", pin_memory=False, num_workers=0,
+                     persistent_workers=False)
     context.add_part("model", NestedResUNet, input_channels=3, output_channels=2, filters=40, dropout_p=0.2,
                      saggital_split=True)
     context.add_part("optimizer", Adam, params="self.model.parameters()", lr=0.0002)

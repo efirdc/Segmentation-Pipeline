@@ -9,25 +9,6 @@ from torch.utils.data.dataloader import default_collate
 import torchio as tio
 
 
-# TODO: Segmentation specific. Move to SegmentationTrainer?
-def subject_collate(batch):
-    batch = default_collate(batch)
-    images = []
-    labels = []
-    for k, v in batch.items():
-        if not isinstance(v, dict) or "type" not in v:
-            continue
-        if "intensity" == v['type'][0]:
-            images.append(v["data"])
-        elif "label" == v['type'][0]:
-            labels.append(v['data'])
-    images = torch.cat(images, dim=1)
-    labels = torch.cat(labels, dim=1)
-    batch[0] = batch["images"] = batch["X"] = images
-    batch[1] = batch["labels"] = batch["y"] = labels
-    return batch
-
-
 class ImageDefinition(dict):
     """ Defines an image or label map that will be loaded as a tio.Image
     Args:
@@ -42,7 +23,8 @@ class ImageDefinition(dict):
         super().__init__()
         self["name"] = name
         self["glob_pattern"] = glob_pattern
-        self["label_names"] = label_names
+        if label_names:
+            self["label_names"] = label_names
         self.update(kwargs)
 
 
@@ -215,6 +197,8 @@ class SubjectFolder(Dataset):
         # Get label data as a (1, W, H, D) tensor
         for collate_label_key, collate_label_name in self.collate_labels.items():
             subject[collate_label_key] = subject[collate_label_name].data
+            if "label_names" in subject[collate_label_name]:
+                subject[collate_label_key + "_label_names"] = subject[collate_label_name]['label_names']
 
         return subject
 
@@ -243,6 +227,7 @@ class SubjectFolder(Dataset):
         # TODO: Switch or add support for multi-channel (N, C, W, H, D) labels. This could be useful for nested labels.
         for collate_label_key in self.collate_labels.keys():
             out_dict[collate_label_key] = torch.cat([subject[collate_image_key].data for subject in batch])
+            out_dict[collate_label_key + "_label_names"] = batch[0][collate_label_key + "_label_names"]
 
         return out_dict
 

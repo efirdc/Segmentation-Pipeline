@@ -23,6 +23,7 @@ import io
 import wandb
 
 from evaluation import dice_validation
+from utils import CudaTimer
 
 EXIT = threading.Event()
 EXIT.clear()
@@ -107,6 +108,7 @@ class SegmentationTrainer:
         label_names = target_label["label_names"]
         label_names_transformed = transform_label_names(subject, target_label, label_names)
         label_names_inverse = {name: i for name, i in label_names.items() if name in label_names_transformed}
+
         label_transforms = []
         for t in subject.history:
             if type(t) not in (tio.RemapLabels, tio.RemoveLabels, tio.SequentialLabels):
