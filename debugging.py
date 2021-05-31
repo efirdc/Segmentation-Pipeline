@@ -10,13 +10,27 @@ if __name__ == "__main__":
         device = torch.device('cpu')
         print("CUDA is not available. Using CPU.")
 
-    config = load_module("./configs/diffusion_hippocampus.py")
+    #config = load_module("./configs/diffusion_hippocampus.py")
+    #variables = dict(DATASET_PATH="X:/Datasets/Diffusion_MRI/Subjects/", CHECKPOINTS_PATH="X:/Checkpoints/")
+    #context = config.get_context(device, variables)
 
-    variables = dict(DATASET_PATH="X:/Datasets/Diffusion_MRI/Subjects/", CHECKPOINTS_PATH="X:/Checkpoints/")
+    config = load_module("./configs/qsm_deep_grey_matter.py")
+    variables = dict(DATASET_PATH="X:/Datasets/DGM/segmentation_3T_ps18_v3/", CHECKPOINTS_PATH="X:/Checkpoints/")
     context = config.get_context(device, variables)
 
-    print("Collate fn:", context.dataloader.collate_fn)
+    untransformed_subject = context.dataset.subjects[0]
+    print("Original labels:")
+    print(untransformed_subject.dgm['label_names'])
 
+    subject = context.dataset[0]
+    print("\nTransformed labels:")
+    print(subject.dgm['label_names'])
+
+    inverse_subject = subject.apply_inverse_transform(warn=False)
+    print("\nInverse transformed labels:")
+    print(inverse_subject.dgm['label_names'])
+
+    '''
     def sample_data(loader):
         while True:
             for batch in loader:
@@ -26,3 +40,4 @@ if __name__ == "__main__":
         loader = sample_data(context.dataloader)
         batch = next(loader)
         print(batch)
+    '''
