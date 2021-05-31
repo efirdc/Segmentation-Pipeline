@@ -58,8 +58,8 @@ class SubjectFolder(Dataset):
             path: str,
             image_definitions: Sequence[ImageDefinition],
             label_definitions: Sequence[ImageDefinition],
-            collate_images: Dict[str, Sequence[str]] = None,
-            collate_labels: Dict[str, str] = None,
+            collate_images: Sequence[str] = None,
+            collate_labels: Sequence[str] = None,
             transforms: tio.Transform = None,
             require_images: bool = False,
             include_subjects: Sequence[str] = None,
@@ -189,17 +189,6 @@ class SubjectFolder(Dataset):
         if self.transforms is not None:
             subject = self.transforms(subject)
 
-        # Concatenate (c, W, H, D) images on channel axis to (C, W, H, D) tensors
-        for collate_image_key, collate_image_names in self.collate_images.items():
-            collate_images = [subject[image_name].data for image_name in collate_image_names]
-            subject[collate_image_key] = torch.cat(collate_images)
-
-        # Get label data as a (1, W, H, D) tensor
-        for collate_label_key, collate_label_name in self.collate_labels.items():
-            subject[collate_label_key] = subject[collate_label_name].data
-            if "label_names" in subject[collate_label_name]:
-                subject[collate_label_key + "_label_names"] = subject[collate_label_name]['label_names']
-
         return subject
 
     def __contains__(self, item):
@@ -220,14 +209,13 @@ class SubjectFolder(Dataset):
         out_dict = {}
 
         # Stack the (C, W, H, D) images into a (N, C, W, H, D) image i.e. this adds the batch dimension
-        for collate_image_key, collate_image_names in self.collate_images.items():
-            out_dict[collate_image_key] = torch.stack([subject[collate_image_key] for subject in batch])
+        for collate_image_name in self.collate_images:
+            out_dict[collate_image_name] = torch.stack([subject[collate_image_name].data for subject in batch])
 
         # Stack the (1, W, H, D) labels into a (N, W, H, D) label
         # TODO: Switch or add support for multi-channel (N, C, W, H, D) labels. This could be useful for nested labels.
-        for collate_label_key in self.collate_labels.keys():
-            out_dict[collate_label_key] = torch.cat([subject[collate_image_key].data for subject in batch])
-            out_dict[collate_label_key + "_label_names"] = batch[0][collate_label_key + "_label_names"]
+        for collate_image_name in self.collate_labels:
+            out_dict[collate_image_name] = torch.cat([subject[collate_image_name].data for subject in batch])
 
         return out_dict
 
