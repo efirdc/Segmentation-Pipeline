@@ -7,6 +7,8 @@ from evaluation import HybridLogisticDiceLoss
 from torch.utils.data import DataLoader, RandomSampler
 from torch.optim import Adam
 
+from transforms import *
+
 
 def get_context(device, variables, predict_hbt=False, **kwargs):
     context = Context(device, name="dmri-hippo", variables=variables, globals=globals())
@@ -25,26 +27,28 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
                                      "right_tail": 6}
                         ),
     ]
-    collate_images = {"X": ["mean_dwi", "md", "fa"]}
-    collate_labels = {"y": "hbt_roi" if predict_hbt else "whole_roi"}
+    collate_images = ["X"]
+    collate_labels = ["y"]
+
+    common_transforms = tio.Compose([
+        tio.Crop((62, 62, 70, 58, 0, 0)),
+        tio.Pad((0, 0, 0, 0, 2, 2), padding_mode="minimum"),
+        CustomRemapLabels({2: 1}, masking_method="Right", include="whole_roi"),
+        CustomRemapLabels({4: 1, 5: 2, 6: 3}, masking_method="Right", include="hbt_roi"),
+        ConcatenateImages(image_names=["mean_dwi", "md", "fa"], image_channels=[1, 1, 1], new_image_name="X"),
+        RenameImage(image_name="hbt_roi" if predict_hbt else "whole_roi", new_image_name="y")
+    ])
 
     transforms = tio.Compose([
         tio.RescaleIntensity((0, 1.), (0.5, 99.5)),
-        # tio.RandomGamma(include=["mean_dwi"]),
         tio.RandomBiasField(coefficients=0.5, include=["mean_dwi"]),
         tio.RescaleIntensity((-1, 1), (0., 99.5)),
-        # tio.Crop((14, 14, 24, 0, 0, 0)),
-        tio.Crop((62, 62, 70, 58, 0, 0)),
-        tio.RemapLabels({2: 1}, masking_method="Right", include="whole_roi"),
-        tio.RemapLabels({4: 1, 5: 2, 6: 3}, masking_method="Right", include="hbt_roi"),
-        # tio.RandomElasticDeformation(num_control_points=(7, 7, 5), image_interpolation="linear"),
-        tio.Pad((0, 0, 0, 0, 2, 2), padding_mode="minimum"),
+        common_transforms
     ])
 
     val_transforms = tio.Compose([
         tio.RescaleIntensity((-1, 1.), (0.5, 99.5)),
-        tio.Crop((62, 62, 70, 58, 0, 0)),
-        tio.Pad((0, 0, 0, 0, 2, 2), padding_mode="minimum"),
+        common_transforms
     ])
 
     cbbrain_val_subjects = [f"cbbrain_{subject_id:03}" for subject_id in (

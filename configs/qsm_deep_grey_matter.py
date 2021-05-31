@@ -1,0 +1,81 @@
+from context import Context
+import torchio as tio
+from datasets import SubjectFolder, ImageDefinition
+from segmentation_training import SegmentationTrainer
+from models import NestedResUNet
+from evaluation import HybridLogisticDiceLoss
+from torch.utils.data import DataLoader, RandomSampler
+from torch.optim import Adam
+
+from transforms import *
+
+
+def get_context(device, variables, **kwargs):
+    context = Context(device, name="qsm-dgm", variables=variables, globals=globals())
+
+    image_definitions = [
+        ImageDefinition(name="t1", glob_pattern="MPRAGE.*"),
+        ImageDefinition(name="qsm", glob_pattern="QSM.*"),
+    ]
+    label_definitions = [
+        ImageDefinition(name="dgm", glob_pattern="vB_PS_r.*",
+                        label_names={'left_ventricle': 1, 'right_ventricle': 2, 'left_caudate': 3, 'right_caudate': 4,
+                                     'left_putamen': 5, 'right_putamen': 6, 'left_thalamus': 7, 'right_thalamus': 8,
+                                     'left_globus_pallidus': 9, 'right_globus_pallidus': 10, 'internal_capsule': 17,
+                                     'left_red_nucleus': 19, 'right_red_nucleus': 20,
+                                     'left_substantia_nigra': 21, 'right_substantia_nigra': 22,
+                                     'left_dentate_nucleus': 23, 'right_dentate_nucleus': 24}
+                        ),
+        ImageDefinition(name="ic", glob_pattern="IC.*",
+                        label_names={'internal_capsule': 17}
+                        ),
+        ImageDefinition(name="pulv", glob_pattern="pulv.*",
+                        label_names={'left_thalamus_pulvinar': 7, 'right_thalamus_pulvinar': 8}
+                        ),
+    ]
+    collate_images = ["X"]
+    collate_labels = ["y"]
+
+    transforms = tio.Compose([
+        tio.RescaleIntensity((-1, 1), (0.1, 99.9)),
+        tio.Crop((68, 68, 72, 72, 16, 16)),
+        CustomRemoveLabels([1, 2, 23, 24], include="dgm"),
+        CustomRemapLabels({4: 3, 6: 5, 10: 9, 22: 21}, masking_method="Right", include="dgm"),
+        CustomSequentialLabels(),
+        ConcatenateImages(image_names=["t1", "qsm"], image_channels=[1, 1], new_image_name="X"),
+        RenameImage(image_name="dgm", new_image_name="y")
+    ])
+    val_transforms = transforms
+
+    val_subjects = ["Cb_Brain_058", "Cb_Brain_106"]
+    dataset_params = dict(path="$DATASET_PATH", image_definitions=image_definitions,
+                          label_definitions=label_definitions, collate_images=collate_images,
+                          collate_labels=collate_labels, require_images=True)
+
+    context.add_part("dataset", SubjectFolder, exclude_subjects=val_subjects, transforms=transforms,
+                     **dataset_params)
+    context.add_part("val_dataset", SubjectFolder, include_subjects=val_subjects, transforms=val_transforms,
+                     **dataset_params)
+
+    context.add_part("datasampler", RandomSampler, data_source="self.dataset")
+    context.add_part("dataloader", DataLoader, dataset="self.dataset", batch_size=4, sampler="self.datasampler",
+                     drop_last=False, collate_fn="self.dataset.collate", pin_memory=False, num_workers=0,
+                     persistent_workers=False)
+    context.add_part("model", NestedResUNet, input_channels=2, output_channels=10, filters=40, dropout_p=0.2,
+                     saggital_split=False)
+    context.add_part("optimizer", Adam, params="self.model.parameters()", lr=0.0002)
+    context.add_part("criterion", HybridLogisticDiceLoss)
+    context.add_part("trainer", SegmentationTrainer, save_folder="$CHECKPOINTS_PATH", sample_rate=50, save_rate=250,
+                     val_datasets=[
+                         dict(dataset="self.val_dataset", log_prefix="Val", preload=True, interval=50),
+                     ],
+                     val_images=[
+                         dict(interval=50, log_name="image0",
+                              plane="Axial", image_name="qsm", slice=9, legend=True, ncol=1,
+                              subjects=val_subjects),
+                         dict(interval=50, log_name="image1",
+                              plane="Coronal", image_name="qsm", slice=51, legend=True, ncol=1,
+                              subjects=val_subjects),
+                     ])
+
+    return context
