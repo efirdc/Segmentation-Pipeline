@@ -1,6 +1,6 @@
 from context import Context
 import torchio as tio
-from datasets import SubjectFolder, ImageDefinition
+from data_processing.subject_folder import SubjectFolder, ImageDefinition
 from segmentation_training import SegmentationTrainer
 from models import NestedResUNet
 from evaluation import HybridLogisticDiceLoss
@@ -33,24 +33,31 @@ def get_context(device, variables, **kwargs):
                         label_names={'left_thalamus_pulvinar': 7, 'right_thalamus_pulvinar': 8}
                         ),
     ]
-    collate_images = ["X"]
-    collate_labels = ["y"]
 
     transforms = tio.Compose([
         tio.RescaleIntensity((-1, 1), (0.1, 99.9)),
         tio.Crop((68, 68, 72, 72, 16, 16)),
-        CustomRemoveLabels([1, 2, 23, 24], include="dgm"),
-        CustomRemapLabels({4: 3, 6: 5, 10: 9, 22: 21}, masking_method="Right", include="dgm"),
+        CustomRemoveLabels(
+            labels=['left_ventricle', 'right_ventricle', 'left_dentate_nucleus', 'right_dentate_nucleus'],
+            include="dgm"
+        ),
+        MergeLabels(
+            merge_labels=[('left_caudate', 'right_caudate'),
+                          ('left_putamen', 'right_putamen'),
+                          ('left_globus_pallidus', 'right_globus_pallidus'),
+                          ('left_substantia_nigra', 'right_substantia_nigra')],
+            right_masking_method='Right', include='dgm'
+        ),
         CustomSequentialLabels(),
         ConcatenateImages(image_names=["t1", "qsm"], image_channels=[1, 1], new_image_name="X"),
-        RenameImage(image_name="dgm", new_image_name="y")
+        CopyImage(image_name="dgm", new_image_name="y"),
+        CustomOneHot(num_classes=10, include="y")
     ])
     val_transforms = transforms
 
     val_subjects = ["Cb_Brain_058", "Cb_Brain_106"]
     dataset_params = dict(path="$DATASET_PATH", image_definitions=image_definitions,
-                          label_definitions=label_definitions, collate_images=collate_images,
-                          collate_labels=collate_labels, require_images=True)
+                          label_definitions=label_definitions, collate_attributes=["X", "y"], require_images=True)
 
     context.add_part("dataset", SubjectFolder, exclude_subjects=val_subjects, transforms=transforms,
                      **dataset_params)
