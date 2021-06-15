@@ -1,7 +1,9 @@
+import copy
+
 import torchio as tio
 
 
-class RenameImage(tio.Transform):
+class CopyImage(tio.Transform):
     def __init__(self, image_name, new_image_name, **kwargs):
         super().__init__(**kwargs)
         self.image_name = image_name
@@ -10,8 +12,7 @@ class RenameImage(tio.Transform):
 
     def apply_transform(self, subject):
         image = subject[self.image_name]
-        del subject[self.image_name]
-        subject[self.new_image_name] = image
+        subject[self.new_image_name] = copy.deepcopy(image)
 
         return subject
 
@@ -19,4 +20,4 @@ class RenameImage(tio.Transform):
         return True
 
     def inverse(self):
-        return RenameImage(self.new_image_name, self.image_name)
+        return CopyImage(self.new_image_name, self.image_name)

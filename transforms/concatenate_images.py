@@ -32,7 +32,6 @@ class ConcatenateImages(tio.Transform):
 
         subject[self.new_image_name] = new_image
 
-
         return subject
 
     def is_invertible(self):
