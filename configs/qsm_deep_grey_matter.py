@@ -1,6 +1,6 @@
 from context import Context
 import torchio as tio
-from data_processing.subject_folder import SubjectFolder, ImageDefinition
+from data_processing.subject_folder import SubjectFolder
 from segmentation_training import SegmentationTrainer
 from models import NestedResUNet
 from evaluation import HybridLogisticDiceLoss
@@ -19,7 +19,7 @@ def get_context(device, variables, **kwargs):
     ]
     label_definitions = [
         ImageDefinition(name="dgm", glob_pattern="vB_PS_r.*",
-                        label_names={'left_ventricle': 1, 'right_ventricle': 2, 'left_caudate': 3, 'right_caudate': 4,
+                        label_values={'left_ventricle': 1, 'right_ventricle': 2, 'left_caudate': 3, 'right_caudate': 4,
                                      'left_putamen': 5, 'right_putamen': 6, 'left_thalamus': 7, 'right_thalamus': 8,
                                      'left_globus_pallidus': 9, 'right_globus_pallidus': 10, 'internal_capsule': 17,
                                      'left_red_nucleus': 19, 'right_red_nucleus': 20,
@@ -27,10 +27,10 @@ def get_context(device, variables, **kwargs):
                                      'left_dentate_nucleus': 23, 'right_dentate_nucleus': 24}
                         ),
         ImageDefinition(name="ic", glob_pattern="IC.*",
-                        label_names={'internal_capsule': 17}
+                        label_values={'internal_capsule': 17}
                         ),
         ImageDefinition(name="pulv", glob_pattern="pulv.*",
-                        label_names={'left_thalamus_pulvinar': 7, 'right_thalamus_pulvinar': 8}
+                        label_values={'left_thalamus_pulvinar': 7, 'right_thalamus_pulvinar': 8}
                         ),
     ]
 

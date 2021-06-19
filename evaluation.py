@@ -62,10 +62,10 @@ def dice_metric(label_a, label_b, num_classes):
     return dice_coeffs
 
 
-def dice_validation(prediction, target, label_names, prefix=None):
-    dice_scores = dice_metric(prediction, target, len(label_names)).mean(dim=0)
-    names = list(label_names.keys())
-    names.sort(key=lambda name: label_names[name])
+def dice_validation(prediction, target, label_values, prefix=None):
+    dice_scores = dice_metric(prediction, target, len(label_values)).mean(dim=0)
+    names = list(label_values.keys())
+    names.sort(key=lambda name: label_values[name])
     names = [name.replace("_", " ").title() for name in names]
     if prefix is not None:
         names = [prefix + " " + name for name in names]

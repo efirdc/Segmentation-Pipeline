@@ -20,15 +20,15 @@ if __name__ == "__main__":
 
     untransformed_subject = context.dataset.subjects[0]
     print("Original labels:")
-    print(untransformed_subject.dgm['label_names'])
+    print(untransformed_subject.dgm['label_values'])
 
     subject = context.dataset[0]
     print("\nTransformed labels:")
-    print(subject.dgm['label_names'])
+    print(subject.dgm['label_values'])
 
     inverse_subject = subject.apply_inverse_transform(warn=False)
     print("\nInverse transformed labels:")
-    print(inverse_subject.dgm['label_names'])
+    print(inverse_subject.dgm['label_values'])
 
     '''
     def sample_data(loader):

@@ -52,15 +52,18 @@ class ContourImageEvaluator(Evaluator):
                + list(get_cmap("tab20").colors)
         contours = []
 
-        for name, label_id in self.label_names.items():
+        label_values = subjects[0]['label_values']
+        for name, label_id in label_values.items():
             contour = plt.contour(X_grid, Y_grid, y == label_id, levels=[0.5], colors=cmap[label_id:label_id+1],
                                   **options)
             plt.contour(X_grid, Y_grid, y_pred == label_id, levels=[0.95], linestyles="dashed",
                         colors=cmap[label_id:label_id+1], **options)
             contours.append(contour)
         if self.legend:
-            plt.legend([contour.legend_elements()[0][0] for contour in contours], subject[0]["y"]['label_names'].items(),
-                       ncol=3, bbox_to_anchor=(0.5, 0), loc='upper center', fancybox=True)
+            plt.legend(
+                [contour.legend_elements()[0][0] for contour in contours],
+                label_values.items(), ncol=3, bbox_to_anchor=(0.5, 0), loc='upper center', fancybox=True
+            )
         warnings.resetwarnings()
         plt.tick_params(which='both', bottom=False, top=False, left=False, labelbottom=False, labelleft=False)
         buf = io.BytesIO()

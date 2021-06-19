@@ -8,7 +8,7 @@ from typing import Sequence, Tuple, Union
 
 # These transformations behave almost the same as RemapLabels, RemoveLabels, and SequentialLabels from torchio
 # However an additional feature is supported to keep track of label names in the label map
-# The LabelMap can have a Dict[str, int] attribute 'label_names' which maps the name of the label to it's id
+# The LabelMap can have a Dict[str, int] attribute 'label_values' which maps the name of the label to it's id
 # in the LabelMap. These custom versions of the label transformations will also update the ids in this dictionary.
 # It is recommended that you use these versions for this pipeline.
 
@@ -44,31 +44,32 @@ class CustomRemapLabels(LabelTransform):
                 new_data[mask & (image.data == old_id)] = new_id
             image.set_data(new_data)
 
-            if "label_names" not in image:
+            if "label_values" not in image:
                 continue
 
             # Keep track of the label name history with a stack
-            if "label_names_hist" not in image:
-                image["label_names_hist"] = []
+            if "label_values_hist" not in image:
+                image["label_values_hist"] = []
 
-            label_names = image['label_names']
+            label_values = image['label_values']
 
             # If this is the inverse pass, then pop label names off the history stack.
             # Also filter out any removed labels TODO: Is this filter necessary?
             if self.inversed:
-                old_label_names = image["label_names_hist"].pop()
-                image['label_names'] = {
-                    name: label for name, label in old_label_names.items()
-                    if name in label_names
+                old_label_values = image["label_values_hist"].pop()
+                image['label_values'] = {
+                    label_name: label_value
+                    for label_name, label_value in old_label_values.items()
+                    if label_name in label_values
                 }
                 continue
 
-            # On the forward pass, apply the remapping to the label_names
+            # On the forward pass, apply the remapping to the label_values
             if self.invertible:
-                image["label_names_hist"].append(label_names.copy())
-            for name, label in label_names.items():
-                if label in self.remapping:
-                    label_names[name] = self.remapping[label]
+                image["label_values_hist"].append(label_values.copy())
+            for label_name, label_value in label_values.items():
+                if label_value in self.remapping:
+                    label_values[label_name] = self.remapping[label_value]
 
         return subject
 
@@ -117,10 +118,11 @@ class CustomRemoveLabels(LabelTransform):
                 if isinstance(label, int):
                     labels.append(label)
                 elif isinstance(label, str):
-                    if 'label_names' not in image:
-                        raise RuntimeError(f'Image must have a Dict[str, int] "label_names" '
-                                           'in order to remove a label by its name.')
-                    labels.append(image['label_names'][label])
+                    if 'label_values' not in image:
+                        raise RuntimeError(f'Image must have a Dict[str, int] property '
+                                           f'with the key "label_values" in order to '
+                                           f'remove a label by its name.')
+                    labels.append(image['label_values'][label])
                 else:
                     raise ValueError(f'Label to remove must be a string or an int, '
                                      f'not {label} of type {type(label)}.')
@@ -134,13 +136,12 @@ class CustomRemoveLabels(LabelTransform):
             )
             subject = transform(subject)
 
-            if "label_names" not in image:
+            if "label_values" not in image:
                 continue
 
-            image['label_names'] = {
-                name: label for name, label in image['label_names'].items()
-                if label not in labels
-            }
+            for label_name, label_value in image['label_values'].items():
+                if label_value in labels:
+                    del image[label_name]
 
         return subject
 
@@ -164,8 +165,8 @@ class CustomSequentialLabels(LabelTransform):
             if not isinstance(image, tio.LabelMap):
                 continue
 
-            if 'label_names' in image:
-                unique_labels = list(image['label_names'].values())
+            if 'label_values' in image:
+                unique_labels = list(image['label_values'].values())
                 unique_labels.sort()
             else:
                 unique_labels = torch.unique(image.data).tolist()
@@ -285,12 +286,12 @@ class MergeLabels(LabelTransform):
                 continue
 
             merge_labels = self.merge_labels
-            if 'label_names' in image:
-                label_names = image['label_names']
+            if 'label_values' in image:
+                label_values = image['label_values']
 
                 def convert_label(label):
                     if isinstance(label, str):
-                        return label_names[label]
+                        return label_values[label]
                     if isinstance(label, int):
                         return label
                     else:
