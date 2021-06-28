@@ -144,7 +144,7 @@ class SubjectFolder(Dataset):
             cohorts['all'] = subject_filter
 
         return SubjectFolder(self.root, self.subject_path, self.subject_loader, cohorts,
-                             self.transforms, self.collate_attributes)
+                             transforms, self.collate_attributes)
 
     def __len__(self):
         return len(self.subjects)
