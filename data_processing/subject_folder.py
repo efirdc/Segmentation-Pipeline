@@ -100,7 +100,7 @@ class SubjectFolder(Dataset):
             self.set_transform(cohort)
             if cohort == "all" or cohort is None:
                 self.set_subjects(self.all_subjects)
-            if cohort in self.cohorts:
+            elif cohort in self.cohorts:
                 subject_filter = self.cohorts[cohort]
                 self.set_subjects(subject_filter(self.all_subjects))
             else:
