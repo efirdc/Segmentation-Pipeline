@@ -27,10 +27,10 @@ SimpleITK==1.2.4
 six==1.15.0
 smmap==4.0.0
 subprocess32==3.5.4
-torch==1.8.1+cu102
+torch==1.8.1
 torchaudio==0.8.1
 torchio==0.18.36
-torchvision==0.9.1+cu102
+torchvision==0.9.1
 tqdm==4.60.0
 typing-extensions==3.7.4.3
 urllib3==1.26.4
