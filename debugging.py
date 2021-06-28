@@ -1,6 +1,9 @@
 import torch
-from utils import load_module
+import torchio as tio
+from torchio.transforms.preprocessing.label.label_transform import LabelTransform
 
+from transforms import *
+from utils import load_module, filter_transform
 
 if __name__ == "__main__":
     if torch.cuda.is_available():
@@ -14,30 +17,36 @@ if __name__ == "__main__":
     #variables = dict(DATASET_PATH="X:/Datasets/Diffusion_MRI/Subjects/", CHECKPOINTS_PATH="X:/Checkpoints/")
     #context = config.get_context(device, variables)
 
-    config = load_module("./configs/qsm_deep_grey_matter.py")
-    variables = dict(DATASET_PATH="X:/Datasets/DGM/segmentation_3T_ps18_v3/", CHECKPOINTS_PATH="X:/Checkpoints/")
+    config = load_module("./configs/diffusion_hippocampus.py")
+    variables = dict(DATASET_PATH="X:/Datasets/Diffusion_MRI/", CHECKPOINTS_PATH="X:/Checkpoints/")
     context = config.get_context(device, variables)
 
     untransformed_subject = context.dataset.subjects[0]
     print("Original labels:")
-    print(untransformed_subject.dgm['label_values'])
+    print(untransformed_subject['whole_roi']['label_values'])
 
     subject = context.dataset[0]
     print("\nTransformed labels:")
-    print(subject.dgm['label_values'])
+    print(subject['y']['label_values'])
 
-    inverse_subject = subject.apply_inverse_transform(warn=False)
-    print("\nInverse transformed labels:")
-    print(inverse_subject.dgm['label_values'])
+    transform = subject.get_composed_history()
+    label_transform_types = [LabelTransform, CopyProperty, RenameProperty, ConcatenateImages]
+    label_transform = filter_transform(transform, include_types=label_transform_types)
+    inverse_label_transform = label_transform.inverse(warn=False)
 
-    '''
-    def sample_data(loader):
-        while True:
-            for batch in loader:
-                yield batch
+    inverse_subject = inverse_label_transform(tio.Subject({'y': subject['y']}))
+    print("\nInverse labels")
+    print(inverse_subject['whole_roi']['label_values'])
 
-    for i in range(2):
-        loader = sample_data(context.dataloader)
-        batch = next(loader)
-        print(batch)
-    '''
+    evaluation_transform = tio.Compose([
+        CustomSequentialLabels(),
+        filter_transform(inverse_label_transform, exclude_types=[CustomRemapLabels]).inverse(warn=False)
+    ])
+    print(evaluation_transform)
+
+    evaluation_subject = evaluation_transform(inverse_subject)
+    print("\nEvaluation labels")
+    print(evaluation_subject['y']['label_values'])
+
+
+

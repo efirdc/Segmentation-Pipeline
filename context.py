@@ -1,6 +1,8 @@
 import torch
 from datetime import datetime
 
+import dill
+
 
 # Holds all components for a pytorch experiment
 # Handles initialization and serialization in a convenient way
@@ -134,7 +136,7 @@ class Context:
         checkpoint = dict(name=self.name, parts=self.parts, epoch=self.epoch, iteration=self.iteration,
                           creation_time=self.creation_time, variables=self.variables, info=self.info)
 
-        torch.save(checkpoint, filename)
+        torch.save(checkpoint, filename, pickle_module=dill)
 
     def __repr__(self):
         out = f'{self.name}\n'

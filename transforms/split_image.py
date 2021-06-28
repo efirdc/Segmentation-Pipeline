@@ -21,6 +21,9 @@ class SplitImage(tio.Transform):
         self.args_names = ('image_name', 'new_image_names', 'new_image_channels',)
 
     def apply_transform(self, subject):
+        if self.image_name not in subject:
+            return subject
+
         target_image = subject[self.image_name]
         image_class = target_image.__class__
 

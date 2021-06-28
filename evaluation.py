@@ -20,7 +20,6 @@ class HybridLogisticDiceLoss(nn.Module):
     def forward(self, prediction, target):
         N, C, W, H, D = prediction.shape
         spatial_dims = (2, 3, 4)
-        target = one_hot(target, C)
 
         overlap = torch.sum(prediction * target, dim=spatial_dims)
         total = torch.sum(target * target, dim=spatial_dims) + torch.sum(prediction * prediction, dim=spatial_dims)
@@ -32,9 +31,16 @@ class HybridLogisticDiceLoss(nn.Module):
         logistic_loss = -logistic
         dice_loss = 1 - dice_coeffs
 
-        hybrid = ((1. - self.dice_weight) * logistic_loss + self.dice_weight * dice_loss) * 2.
+        logistic_loss = logistic_loss * (1. - self.dice_weight)
+        dice_loss = dice_loss * self.dice_weight
 
-        return torch.mean(hybrid)
+        hybrid = logistic_loss + dice_loss
+
+        return {
+            'loss': torch.mean(hybrid),
+            "dice_loss": torch.mean(dice_loss),
+            "logistic_loss": torch.mean(logistic_loss)
+        }
 
 
 def make_sequential(label):

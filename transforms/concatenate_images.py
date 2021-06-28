@@ -22,6 +22,9 @@ class ConcatenateImages(tio.Transform):
         self.args_names = ('image_names', 'image_channels', 'new_image_name',)
 
     def apply_transform(self, subject):
+        if any(image_name not in subject for image_name in self.image_names):
+            return subject
+
         images = [subject[image_name] for image_name in self.image_names]
         new_image_data = torch.cat([image.data for image in images])
 

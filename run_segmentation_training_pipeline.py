@@ -7,7 +7,7 @@ import wandb
 import torch
 
 from context import Context
-from configs import *
+from utils import load_module
 
 
 # Converts a time string with format days-hours:minutes:seconds to the number of seconds (integer)
@@ -31,7 +31,10 @@ if __name__ == "__main__":
                         help="Path to the dataset. If the dataset is a .tar file it will be unzipped first."
                         )
     parser.add_argument("checkpoints_path", type=str, help="Path to directory for saving checkpoints.")
-    parser.add_argument("config", type=str, default="", help="Defines which configuration to use.")
+    parser.add_argument("config", type=str, default="",
+                        help="Path to a python file which sets up the configuration. This file must define a function"
+                             "get_context() which returns a Context object. See the ./configs/ folder for examples."
+                        )
     parser.add_argument("--work_path", type=str, default=None,
                         help="Copy the dataset to this directory before training begins."
                         )
@@ -48,6 +51,18 @@ if __name__ == "__main__":
                         )
     parser.add_argument("--wandb_project", type=str, default="auto-segmentation",
                         help="Project name for Weights and Biases logging service."
+                        )
+    parser.add_argument("--wandb_directory", type=str, default=None,
+                        help="Directory where wandb metadata will be stored."
+                        )
+    parser.add_argument("--preload_training_data", type=bool, default=False,
+                        help="Optionally preload the entire training dataset into memory."
+                        )
+    parser.add_argument("--preload_validation_data", type=bool, default=False,
+                        help="Optionally preload the entire validation dataset into memory."
+                        )
+    parser.add_argument("--validation_batch_size", type=int, default=4,
+                        help="How many validation subjects should be run through the model at once."
                         )
     args, unknown_args = parser.parse_known_args()
 
@@ -107,19 +122,20 @@ if __name__ == "__main__":
     # Initialize a new context, or load from a file to resume training
     variables = dict(DATASET_PATH=str(dataset_path), CHECKPOINTS_PATH=args.checkpoints_path)
     if args.load_checkpoint is None:
-        context = get_context(args.config, device, variables)
+        config = load_module(args.config)
+        context = config.get_context(device, variables)
     else:
         context = Context(device, file_name=args.load_checkpoint, variables=variables, globals=globals())
 
     # Setup Weights and Biases logging service
     print(f"initializing wandb")
-    wandb_params = {}
+    wandb_params = dict(project=args.wandb_project, dir=args.wandb_directory)
     if "wandb_id" in context.info:
         wandb_params["id"] = context.info["wandb_id"]
         wandb_params["resume"] = "allow"
     else:
         wandb_params["id"] = context.info["wandb_id"] = wandb.util.generate_id()
-    wandb.init(project=args.wandb_project, **wandb_params)
+    wandb.init(**wandb_params)
 
     '''
     for i in range(100):
@@ -139,4 +155,7 @@ if __name__ == "__main__":
     print(str(context))
 
     print("entering training loop")
-    context.trainer.train(context, args.iterations, stop_time=stop_time, wandb_logging=True)
+    context.trainer.train(context, args.iterations, stop_time=stop_time, wandb_logging=True,
+                          preload_training_data=args.preload_training_data,
+                          preload_validation_data=args.preload_validation_data,
+                          validation_batch_size=args.validation_batch_size)

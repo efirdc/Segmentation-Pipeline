@@ -20,7 +20,7 @@ class SubjectFilter(ABC):
     ):
         subjects = vargs_or_sequence(subjects)
         if is_sequence(subjects) and all(isinstance(subject, tio.Subject) for subject in subjects):
-            return filter(self.subject_filter, subjects)
+            return list(filter(self.subject_filter, subjects))
         else:
             raise ValueError("A SubjectFilter can only be applied to a sequence of tio.Subject, "
                              f"not {subjects}")
@@ -28,6 +28,24 @@ class SubjectFilter(ABC):
     @abstractmethod
     def subject_filter(self, subject: tio.Subject) -> bool:
         raise NotImplementedError()
+
+    def __and__(self, other):
+        assert other is SubjectFilter
+        return ComposeFilters(self, other)
+
+    def __or__(self, other):
+        assert other is SubjectFilter
+        return AnyFilter(self, other)
+
+    def __sub__(self, other):
+        assert other is SubjectFilter
+        return ComposeFilters(self, NegateFilter(other))
+
+    def __neg__(self):
+        return NegateFilter(self)
+
+    def __invert__(self):
+        return NegateFilter(self)
 
 
 class RequireAttributes(SubjectFilter):
@@ -100,7 +118,7 @@ class ForbidAttributes(SubjectFilter):
             }
             return any(
                 not as_set(attrib_value).isdisjoint(as_set(subject.get(attrib_name)))
-                for attrib_name, attrib_value in attributes_in_subject
+                for attrib_name, attrib_value in attributes_in_subject.items()
             )
 
 

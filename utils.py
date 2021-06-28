@@ -2,7 +2,12 @@ import importlib.util
 from pathlib import Path
 import torch
 import time
-from collections.abc import Sequence
+from typing import Type, Sequence
+
+import torchio as tio
+import pandas as pd
+from PIL import Image
+import wandb
 
 
 def is_sequence(x):
@@ -71,3 +76,50 @@ class CudaTimer:
         if name:
             self.timestamps[name] = dt
         return dt
+
+
+def dict_to_device(elem, device):
+    if isinstance(elem, dict):
+        return {
+            key: dict_to_device(value, device)
+            for key, value in elem.items()
+        }
+    elif isinstance(elem, torch.Tensor):
+        tensor = elem
+        tensor = tensor.to(device)
+        return tensor
+    return elem
+
+
+# TODO: Contribute this as a method to tio.Compose.
+# as it doesnt make sense to call unless tio.Compose is the root transform
+def filter_transform(
+        transform: tio.Compose,
+        include_types: Sequence[Type[tio.Transform]] = None,
+        exclude_types: Sequence[Type[tio.Transform]] = None,
+        ):
+    if isinstance(transform, tio.Compose):
+        return tio.Compose([
+            filter_transform(t, include_types=include_types, exclude_types=exclude_types)
+            for t in transform
+            if isinstance(t, tio.Compose) or (
+                (include_types is None or any(isinstance(t, typ) for typ in include_types))
+                and
+                (exclude_types is None or not any(isinstance(t, typ) for typ in exclude_types))
+            )
+        ])
+    return transform
+
+
+
+def to_wandb(elem):
+    if isinstance(elem, dict):
+        return {
+            key: to_wandb(val)
+            for key, val in elem.items()
+        }
+    elif isinstance(elem, pd.DataFrame):
+        return wandb.Table(dataframe=elem)
+    elif isinstance(elem, Image.Image):
+        return wandb.Image(elem)
+    return elem

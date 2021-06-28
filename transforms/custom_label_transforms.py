@@ -171,8 +171,8 @@ class CustomSequentialLabels(LabelTransform):
             else:
                 unique_labels = torch.unique(image.data).tolist()
             remapping = {
-                unique_labels[i]: i
-                for i in range(1, len(unique_labels))
+                unique_labels[i]: (i + 1)
+                for i in range(len(unique_labels))
             }
             transform = CustomRemapLabels(
                 remapping=remapping,
@@ -187,30 +187,33 @@ class CustomSequentialLabels(LabelTransform):
 class CustomOneHot(LabelTransform):
     def __init__(
         self,
-        num_classes: [int, Sequence[int]],
+        num_classes: int = -1,
         **kwargs
     ):
         super().__init__(**kwargs)
-        self.num_classes = [num_classes] if isinstance(num_classes, int) else num_classes
+        self.num_classes = num_classes
+        self.kwargs = kwargs
         self.args_names = ('num_classes',)
 
     def apply_transform(self, subject):
 
         for image in self.get_images(subject):
             num_channels = image.data.shape[0]
-            if num_channels != len(self.num_classes):
+            if num_channels != 1:
                 message = (
-                    f'The number of input channels was expected to be {len(self.num_classes)},'
+                    f'The number of input channels was expected to be {1},'
                     f' but it is {num_channels}'
                 )
                 raise RuntimeError(message)
 
-            new_data = []
-            for i, num_classes in enumerate(self.num_classes):
-                data = image.data[i]
-                one_hot = F.one_hot(data.long(), num_classes=num_classes)
-                new_data.append(one_hot.permute(3, 0, 1, 2).type(data.type()))
-            image.set_data(torch.cat(new_data))
+            if self.num_classes == -1 and 'label_values' in image:
+                num_classes = max(image['label_values'].values()) + 1
+            else:
+                num_classes = self.num_classes
+
+            data = image.data[0]
+            one_hot = F.one_hot(data.long(), num_classes=num_classes)
+            image.set_data(one_hot.permute(3, 0, 1, 2).type(data.type()))
 
         return subject
 
@@ -218,32 +221,24 @@ class CustomOneHot(LabelTransform):
         return True
 
     def inverse(self):
-        return CustomArgMax(num_classes=self.num_classes)
+        return CustomArgMax(num_classes=self.num_classes, **self.kwargs)
 
 
 class CustomArgMax(LabelTransform):
     def __init__(
         self,
-        num_classes: [int, Sequence[int]],
+        num_classes: int = -1,
         **kwargs
     ):
         super().__init__(**kwargs)
-        self.num_classes = [num_classes] if isinstance(num_classes, int) else num_classes
+        self.kwargs = kwargs
+        self.num_classes = num_classes
         self.args_names = ('num_classes',)
 
     def apply_transform(self, subject):
 
         for image in self.get_images(subject):
-            if image.num_channels != sum(self.num_classes):
-                message = (
-                    f'The number of input channels was expected to be {sum(self.num_classes)},'
-                    f' but it is {image.num_channels}'
-                )
-                raise RuntimeError(message)
-
-            new_data = torch.split(image.data, self.num_classes)
-            new_data = [torch.argmax(x, dim=0, keepdim=True) for x in new_data]
-            new_data = torch.cat(new_data)
+            new_data = torch.argmax(image.data, dim=0, keepdim=True)
             image.set_data(new_data)
 
         return subject
@@ -252,7 +247,7 @@ class CustomArgMax(LabelTransform):
         return True
 
     def inverse(self):
-        return CustomOneHot(num_classes=self.num_classes)
+        return CustomOneHot(num_classes=self.num_classes, **self.kwargs)
 
 
 TypeLabelID = Union[int, str]
@@ -274,6 +269,7 @@ class MergeLabels(LabelTransform):
         self.merge_labels = merge_labels
         self.left_masking_method = left_masking_method
         self.right_masking_method = right_masking_method
+        self.args_names = ('merge_labels', 'left_masking_method', 'right_masking_method')
 
     def apply_transform(self, subject):
         images_dict = subject.get_images_dict(
@@ -317,3 +313,6 @@ class MergeLabels(LabelTransform):
             subject = transform(subject)
 
         return subject
+
+    def is_invertible(self):
+        return False

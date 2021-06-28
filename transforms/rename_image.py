@@ -1,9 +1,7 @@
-import copy
-
 import torchio as tio
 
 
-class CopyProperty(tio.Transform):
+class RenameProperty(tio.Transform):
     def __init__(self, old_name, new_name, **kwargs):
         super().__init__(**kwargs)
         self.old_name = old_name
@@ -16,7 +14,8 @@ class CopyProperty(tio.Transform):
             return subject
 
         prop = subject[self.old_name]
-        subject[self.new_name] = copy.deepcopy(prop)
+        subject[self.new_name] = prop
+        del subject[self.old_name]
 
         return subject
 
@@ -24,4 +23,4 @@ class CopyProperty(tio.Transform):
         return True
 
     def inverse(self):
-        return CopyProperty(self.new_name, self.old_name)
+        return RenameProperty(self.new_name, self.old_name)

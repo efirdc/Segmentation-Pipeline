@@ -60,9 +60,8 @@ class AttributeLoader(SubjectLoader):
         matching_files = glob(f"{subject_folder}/{self.glob_pattern}")
 
         for matching_file in matching_files:
-            file_path = f"{subject_folder}/{matching_file}"
 
-            data = self.load_file(file_path)
+            data = self.load_file(matching_file)
 
             if self.multi_subject:
                 if subject_data['name'] not in data:
@@ -135,7 +134,7 @@ class ImageLoader(SubjectLoader):
 
         subject_folder = subject_data['folder']
         matching_files = glob(f"{subject_folder}/{self.glob_pattern}")
-        if len(matching_files == 0):
+        if len(matching_files) == 0:
             return
 
         new_image = self.image_constructor(*matching_files, **self.kwargs)
@@ -156,7 +155,6 @@ class ComposeLoaders(SubjectLoader):
     def __init__(self, *loaders: Union[SubjectLoader, Sequence[SubjectLoader]]):
         self.loaders = vargs_or_sequence(loaders)
 
-    @abstractmethod
     def __call__(self, subject_data):
         for loader in self.loaders:
             loader(subject_data)

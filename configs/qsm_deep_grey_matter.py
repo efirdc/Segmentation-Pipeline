@@ -50,7 +50,7 @@ def get_context(device, variables, **kwargs):
         ),
         CustomSequentialLabels(),
         ConcatenateImages(image_names=["t1", "qsm"], image_channels=[1, 1], new_image_name="X"),
-        CopyImage(image_name="dgm", new_image_name="y"),
+        CopyProperty(image_name="dgm", new_image_name="y"),
         CustomOneHot(num_classes=10, include="y")
     ])
     val_transforms = transforms
