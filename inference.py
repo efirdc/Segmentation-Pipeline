@@ -6,10 +6,10 @@ import os
 
 from post_processing import *
 
-from context import Context, context_globals
-context_globals.update(globals())
+from context import Context
 
-def hippo_inference(context, args, i, log_callback=None):
+
+def inference(context, args, i, log_callback=None):
     subject_name = context.dataset.subjects_dataset.subject_folder_names[i]
     log_text = f"subject {subject_name}: "
     log = False
@@ -107,15 +107,15 @@ if __name__ == "__main__":
         device = torch.device(args.device)
     print("using device", device)
 
-    context = Context(device, file_name=args.model_path, variables=dict(DATASET_FOLDER=args.dataset_path))
+    context = Context(device, file_name=args.model_path, variables=dict(DATASET_FOLDER=args.dataset_path), include=['dataset', 'model'])
 
     # Fix torchio deprecating something...
-    fixed_transform = tio.Compose([
-        tio.Crop((62, 62, 70, 58, 0, 0)),
-        tio.RescaleIntensity((-1, 1), (0.5, 99.5)),
-        tio.Pad((0, 0, 0, 0, 2, 2)),
-        tio.ZNormalization(),
-    ])
+    # fixed_transform = tio.Compose([
+    #     tio.Crop((62, 62, 70, 58, 0, 0)),
+    #     tio.RescaleIntensity((-1, 1), (0.5, 99.5)),
+    #     tio.Pad((0, 0, 0, 0, 2, 2)),
+    #     tio.ZNormalization(),
+    # ])
     context.dataset.subjects_dataset.subject_dataset.set_transform(fixed_transform)
 
     if args.out_folder != "" and not os.path.exists(args.out_folder):
@@ -131,7 +131,7 @@ if __name__ == "__main__":
             out_folder = context.dataset.subjects_dataset.subject_folders[i]
         else:
             out_folder += context.dataset.subjects_dataset.subject_folder_names[i] + "_"
-        out = hippo_inference(context, args, i, log_callback=pbar.write)
+        out = inference(context, args, i, log_callback=pbar.write)
         if args.output_probabilities:
             image = tio.ScalarImage(tensor=out)
             image.save(out_folder + args.output_filename)

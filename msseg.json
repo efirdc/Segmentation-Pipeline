@@ -1,12 +1,12 @@
 {
     "name": "MS_Lesion_Seg",
-    "description": "Detect new MS lesions from two FLAIR images.",
-    "author": "Cory Efird",
+    "description": "Detect new MS lesions from two FLAIR images. Developed my team macewan-im",
+    "author": "Cory Efird (macewan-im)",
     "tool-version": "1.0.0",
     "schema-version": "0.5",
     "command-line": "python /Segmentation-Pipeline/ms-inference.py -t1 [FLAIR1] -t2 [FLAIR2] -o [SEGMENTATION]",
     "container-image": {
-        "image": "dylanjmiller/ms-test:v1.0.0",
+        "image": "dylanjmiller/macewan-im-msseg:v1.0.0 ",
         "index": "hub.docker.com",
         "type": "docker"
     },
