@@ -116,8 +116,8 @@ class ForbidAttributes(SubjectFilter):
                 attrib_name: attrib_value for attrib_name, attrib_value in self.attributes.items()
                 if attrib_name in subject
             }
-            return any(
-                not as_set(attrib_value).isdisjoint(as_set(subject.get(attrib_name)))
+            return all(
+                as_set(attrib_value).isdisjoint(as_set(subject.get(attrib_name)))
                 for attrib_name, attrib_value in attributes_in_subject.items()
             )
 
