@@ -49,6 +49,10 @@ if __name__ == "__main__":
                         help="Length of time to train for. Format: days-hours:minutes:seconds "
                              "Training may stop early if the number of iterations run out first."
                         )
+    parser.add_argument("--device", type=str, default="cuda",
+                        help="Length of time to train for. Format: days-hours:minutes:seconds "
+                             "Training may stop early if the number of iterations run out first."
+                        )
     parser.add_argument("--wandb_project", type=str, default="auto-segmentation",
                         help="Project name for Weights and Biases logging service."
                         )
@@ -112,12 +116,8 @@ if __name__ == "__main__":
     print(f"Using dataset path {dataset_path}")
 
     # Get device
-    if torch.cuda.is_available():
-        device = torch.device('cuda:0')
-        print("using cuda")
-    else:
-        device = torch.device('cpu')
-        print("not using cuda")
+    device = torch.device(args.device)
+    print(f"Using device {device}")
 
     # Initialize a new context, or load from a file to resume training
     variables = dict(DATASET_PATH=str(dataset_path), CHECKPOINTS_PATH=args.checkpoints_path)
