@@ -68,8 +68,8 @@ class ContourImageEvaluator(Evaluator):
             }
 
         H, W = img.shape
-        fig = plt.figure(figsize=tuple(np.array((W, H)) / 7.))
-        plt.imshow(img, cmap="gray", vmin=-1, vmax=1)
+        fig = plt.figure(figsize=tuple(np.array((H, W)) * 0.04))
+        plt.imshow(img, cmap="gray",)
         X_grid, Y_grid = np.meshgrid(np.linspace(0, W - 1, W), np.linspace(0, H - 1, H))
         options = dict(linewidths=1.5, alpha=1.)
         warnings.filterwarnings("ignore")
@@ -79,17 +79,22 @@ class ContourImageEvaluator(Evaluator):
                + list(get_cmap("tab20").colors)
         contours = []
 
-        for label_name, label_id in label_values.items():
-            contour = plt.contour(X_grid, Y_grid, y[label_name], levels=[0.5], colors=cmap[label_id:label_id+1],
-                                  **options)
-            plt.contour(X_grid, Y_grid, y_pred[label_name], levels=[0.95], linestyles="dashed",
-                        colors=cmap[label_id:label_id+1], **options)
-            contours.append(contour)
-        if self.legend:
-            plt.legend(
-                [contour.legend_elements()[0][0] for contour in contours],
-                label_values.items(), ncol=3, bbox_to_anchor=(0.5, 0), loc='upper center', fancybox=True
-            )
+        if out_target:
+            for label_name, label_id in label_values.items():
+                contour = plt.contour(X_grid, Y_grid, y[label_name], levels=[0.5], colors=cmap[label_id:label_id+1],
+                                      **options)
+                contours.append(contour)
+                if self.legend:
+                    plt.legend(
+                        [contour.legend_elements()[0][0] for contour in contours],
+                        label_values.items(), ncol=3, bbox_to_anchor=(0.5, 0), loc='upper center', fancybox=True
+                    )
+
+        if out_pred:
+            for label_name, label_id in label_values.items():
+                plt.contour(X_grid, Y_grid, y_pred[label_name], levels=[0.95], linestyles="dashed",
+                            colors=cmap[label_id:label_id+1], **options)
+
         warnings.resetwarnings()
         plt.tick_params(which='both', bottom=False, top=False, left=False, labelbottom=False, labelleft=False)
         buf = io.BytesIO()
