@@ -1,12 +1,12 @@
 {
-    "name": "MSSeg_Example_Method_CPU",
+    "name": "MS_Lesion_Seg",
     "description": "Detect new MS lesions from two FLAIR images.",
     "author": "Cory Efird",
-    "tool-version": "v0.1.4",
+    "tool-version": "1.0.0",
     "schema-version": "0.5",
     "command-line": "python /Segmentation-Pipeline/ms-inference.py -t1 [FLAIR1] -t2 [FLAIR2] -o [SEGMENTATION]",
     "container-image": {
-        "image": "arthurmassoninria/msseg-cpu-example:v1.0.0",
+        "image": "dylanjmiller/ms-test:v1.0.0",
         "index": "hub.docker.com",
         "type": "docker"
     },
@@ -40,10 +40,5 @@
             "optional": false,
             "path-template": "[SEGMENTATION]"
         }
-    ],
-    "tags": {
-        "purpose": "test MSSeg example method",
-        "status": "example"
-    },
-    "doi": "10.5281/zenodo.4778170"
+    ]
 }

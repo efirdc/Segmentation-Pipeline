@@ -1,0 +1,5 @@
+{
+    "flair_time01": "data/input/raw_data/flair_time01_on_middle_space.nii.gz",
+    "flair_time02": "data/input/raw_data/flair_time02_on_middle_space.nii.gz",
+    "output_segmentation": "data/output/output_segmentation.nii.gz"
+}

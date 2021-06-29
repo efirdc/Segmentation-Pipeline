@@ -1,5 +1,0 @@
-{
-    "flair_time01": "/Segmentation-Pipeline/data/input/flair_time01.nii.gz",
-    "flair_time02": "/Segmentation-Pipeline/data/input/flair_time02.nii.gz",
-    "output_segmentation": "/Segmentation-Pipeline/data/output/output_segmentation.nii.gz"
-}
