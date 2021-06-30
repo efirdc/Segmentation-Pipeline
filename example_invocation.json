@@ -1,0 +1,5 @@
+{
+    "flair_time01": "flair_time01.nii.gz",
+    "flair_time02": "flair_time02.nii.gz",
+    "output_segmentation": "output_segmentation.nii.gz"
+}

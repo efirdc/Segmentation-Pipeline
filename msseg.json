@@ -1,0 +1,44 @@
+{
+    "name": "MS_Lesion_Seg",
+    "description": "Detect new MS lesions from two FLAIR images. Developed my team macewan-im",
+    "author": "Cory Efird (macewan-im)",
+    "tool-version": "1.0.0",
+    "schema-version": "0.5",
+    "command-line": "python /Segmentation-Pipeline/ms-inference.py -t1 [FLAIR1] -t2 [FLAIR2] -o [SEGMENTATION]",
+    "container-image": {
+        "image": "dylanjmiller/macewan-im-msseg:v1.0.0 ",
+        "index": "hub.docker.com",
+        "type": "docker"
+    },
+    "inputs": [
+        {
+            "id": "flair_time01",
+            "name": "The first flair image (e.g. flair_time01.nii.gz)",
+            "optional": false,
+            "type": "File",
+            "value-key": "[FLAIR1]"
+        },
+        {
+            "id": "flair_time02",
+            "name": "The second flair image (e.g. flair_time02.nii.gz)",
+            "optional": false,
+            "type": "File",
+            "value-key": "[FLAIR2]"
+        },
+        {
+            "id": "output_segmentation",
+            "name": "The output segmentation (e.g. segmentation.nii.gz)",
+            "optional": false,
+            "type": "String",
+            "value-key": "[SEGMENTATION]"
+        }
+    ],
+    "output-files": [
+        {
+            "id": "segmentation",
+            "name": "The segmentation output",
+            "optional": false,
+            "path-template": "[SEGMENTATION]"
+        }
+    ]
+}
