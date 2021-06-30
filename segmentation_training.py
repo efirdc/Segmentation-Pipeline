@@ -15,7 +15,7 @@ import wandb
 from evaluators import *
 from data_processing import *
 from transforms import *
-from utils import CudaTimer, dict_to_device, filter_transform, to_wandb
+from utils import Timer, dict_to_device, filter_transform, to_wandb
 
 
 EXIT = threading.Event()
@@ -132,7 +132,7 @@ class SegmentationTrainer:
         y_sample.set_data(torch.ones(1, 1, 1, 1))
 
         # Training loop
-        timer = CudaTimer()
+        timer = Timer(context.device)
         for _ in range(iterations):
             timer.start()
 
