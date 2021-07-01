@@ -29,14 +29,6 @@ class SubjectFilter(ABC):
     def subject_filter(self, subject: tio.Subject) -> bool:
         raise NotImplementedError()
 
-    def __and__(self, other):
-        assert other is SubjectFilter
-        return ComposeFilters(self, other)
-
-    def __or__(self, other):
-        assert other is SubjectFilter
-        return AnyFilter(self, other)
-
     def __sub__(self, other):
         assert other is SubjectFilter
         return ComposeFilters(self, NegateFilter(other))
