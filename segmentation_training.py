@@ -137,7 +137,8 @@ class SegmentationTrainer:
             timer.start()
 
             batch = next(training_data_sampler)
-            batch = dict_to_device(batch, context.device)
+            batch['X']['data'] = batch['X']['data'].to(context.device)
+            batch['y']['data'] = batch['y']['data'].to(context.device)
             timer.stamp("data_loading")
 
             context.model.train()
@@ -173,7 +174,7 @@ class SegmentationTrainer:
                 validation_dataset.set_cohort(validation_filter)
                 validation_subjects = []
                 for batch in validation_dataloader:
-                    batch = dict_to_device(batch, context.device)
+                    batch['X']['data'] = batch['X']['data'].to(context.device)
                     with torch.no_grad():
                         self.seg_predict(context.model, batch, y_sample)
                     validation_subjects += batch['subjects']
