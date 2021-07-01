@@ -11,7 +11,7 @@ from transforms import *
 
 
 def get_context(device, variables, **kwargs):
-    context = Context(device, name="qsm-dgm", variables=variables, globals=globals())
+    context = Context(device, name="qsm-dgm", variables=variables)
 
     image_definitions = [
         ImageDefinition(name="t1", glob_pattern="MPRAGE.*"),

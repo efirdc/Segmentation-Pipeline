@@ -11,7 +11,7 @@ from evaluators import *
 
 
 def get_context(device, variables, predict_hbt=False, **kwargs):
-    context = Context(device, name="dmri-hippo", variables=variables, globals=globals())
+    context = Context(device, name="dmri-hippo", variables=variables)
 
     input_images = ["mean_dwi", "md", "fa"]
     output_labels = ["whole_roi", "hbt_roi"]
@@ -45,8 +45,8 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
     cohorts['ab300'] = RequireAttributes({"protocol": "ab300"})
     cohorts['rescans'] = ForbidAttributes({"rescan_id": "None"})
     cohorts['cbbrain_validation'] = RequireAttributes({"name": cbbrain_validation_subjects})
-    cohorts['ab300_validation'] = cohorts['ab300'] and cohorts['labeled'] and ~cohorts['rescans']
-    cohorts['fasd'] = cohorts['labeled'] and RequireAttributes({"pathologies": "FASD"})
+    cohorts['ab300_validation'] = ComposeFilters([cohorts['ab300'], cohorts['labeled'], RequireAttributes({"rescan_id": "None"})])
+    cohorts['fasd'] = ComposeFilters([cohorts['labeled'], RequireAttributes({"pathologies": "FASD"})])
 
     common_transforms = tio.Compose([
         tio.Crop((62, 62, 70, 58, 0, 0)),
