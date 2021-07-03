@@ -12,7 +12,7 @@ from evaluators import *
 
 
 def get_context(device, variables, **kwargs):
-    context = Context(device, name="msseg2", variables=variables, globals=globals())
+    context = Context(device, name="msseg2", variables=variables)
 
     input_images = ["flair_time01", "flair_time02"]
     output_labels = ["ground_truth"]

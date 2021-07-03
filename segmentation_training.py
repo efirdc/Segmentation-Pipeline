@@ -15,7 +15,7 @@ import wandb
 from evaluators import *
 from data_processing import *
 from transforms import *
-from utils import CudaTimer, dict_to_device, filter_transform, to_wandb
+from utils import Timer, dict_to_device, filter_transform, to_wandb
 
 
 EXIT = threading.Event()
@@ -132,12 +132,13 @@ class SegmentationTrainer:
         y_sample.set_data(torch.ones(1, 1, 1, 1))
 
         # Training loop
-        timer = CudaTimer()
+        timer = Timer(context.device)
         for _ in range(iterations):
             timer.start()
 
             batch = next(training_data_sampler)
-            batch = dict_to_device(batch, context.device)
+            batch['X']['data'] = batch['X']['data'].to(context.device)
+            batch['y']['data'] = batch['y']['data'].to(context.device)
             timer.stamp("data_loading")
 
             context.model.train()
@@ -173,7 +174,7 @@ class SegmentationTrainer:
                 validation_dataset.set_cohort(validation_filter)
                 validation_subjects = []
                 for batch in validation_dataloader:
-                    batch = dict_to_device(batch, context.device)
+                    batch['X']['data'] = batch['X']['data'].to(context.device)
                     with torch.no_grad():
                         self.seg_predict(context.model, batch, y_sample)
                     validation_subjects += batch['subjects']

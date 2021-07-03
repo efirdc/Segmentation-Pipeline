@@ -7,13 +7,11 @@ import dill
 # Holds all components for a pytorch experiment
 # Handles initialization and serialization in a convenient way
 class Context:
-    def __init__(self, device, name=None, parts=None, file_name=None, include=None, patch=None, variables=None,
-                 globals=None):
+    def __init__(self, device, name=None, parts=None, file_name=None, include=None, patch=None, variables=None):
 
         if file_name is None:
             assert name is not None, "name is required for a new context"
 
-        self.globals = globals
         self.name = name
         self.device = device
         self.epoch = 0
@@ -64,12 +62,12 @@ class Context:
             return None
 
     def add_part(self, name, constructor, **params):
-        part = dict(name=name, constructor=constructor.__name__, params=params)
+        part = dict(name=name, constructor=constructor, params=params)
         self.parts.append(part)
         self._init_part(part)
 
     def insert_part(self, i, name, constructor, **params):
-        part = dict(name=name, constructor=constructor.__name__, params=params)
+        part = dict(name=name, constructor=constructor, params=params)
         self.parts.insert(i, part)
         self._init_part(part)
 
@@ -94,7 +92,7 @@ class Context:
 
     def _init_part(self, part):
         name = part["name"]
-        constructor = self.globals[part["constructor"]]
+        constructor = part["constructor"]
         params = self._fix_params(part["params"])
 
         if "optimize_target" in part:
