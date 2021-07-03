@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 import torch
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 from PIL import Image
@@ -24,6 +24,8 @@ class ContourImageEvaluator(Evaluator):
             slice_id: int,
             legend: bool,
             ncol: int,
+            scale: float = 0.04,
+            line_width: float = 1.5,
     ):
         self.plane = plane
         self.image_name = image_name
@@ -32,6 +34,8 @@ class ContourImageEvaluator(Evaluator):
         self.slice_id = slice_id
         self.legend = legend
         self.ncol = ncol
+        self.scale = scale
+        self.line_width = line_width
 
     def slice_and_make_grid(self, subjects, image_name, channel, impute_shape, pad_value=0):
         slices = []
@@ -68,10 +72,10 @@ class ContourImageEvaluator(Evaluator):
             }
 
         H, W = img.shape
-        fig = plt.figure(figsize=tuple(np.array((H, W)) * 0.04))
+        fig = plt.figure(figsize=tuple(np.array((W, H)) * self.scale))
         plt.imshow(img, cmap="gray",)
         X_grid, Y_grid = np.meshgrid(np.linspace(0, W - 1, W), np.linspace(0, H - 1, H))
-        options = dict(linewidths=1.5, alpha=1.)
+        options = dict(linewidths=self.line_width, alpha=1.)
         warnings.filterwarnings("ignore")
         cmap = [None, "r", "g", "b", "y", "c", "m"] \
                + list(get_cmap("Accent").colors) + list(get_cmap("Dark2").colors) \
