@@ -12,10 +12,10 @@ def saturate_probabilities(x):
 
 
 class HybridLogisticDiceLoss(nn.Module):
-    def __init__(self, ignore_background=False, dice_weight=0.5):
+    def __init__(self, dice_weight=0.5, logistic_weights=None):
         super().__init__()
-        self.ignore_background = ignore_background
         self.dice_weight = dice_weight
+        self.logistic_weights = logistic_weights
 
     def forward(self, prediction, target):
         N, C, W, H, D = prediction.shape
@@ -27,6 +27,10 @@ class HybridLogisticDiceLoss(nn.Module):
 
         eps = 1e-8
         logistic = torch.mean(target * (torch.log(prediction + eps) - eps), dim=spatial_dims)
+        if self.logistic_weights is not None:
+            logistic_weights = torch.tensor(self.logistic_weights)[None]
+            logistic_weights = logistic_weights.to(logistic.device)
+            logistic = logistic * logistic_weights
 
         logistic_loss = -logistic
         dice_loss = 1 - dice_coeffs
