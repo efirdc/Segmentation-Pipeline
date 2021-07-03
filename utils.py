@@ -61,8 +61,9 @@ def slice_volume(x: torch.tensor, channel_id: int, plane: str, slice_id: int):
         return torch.rot90(x[channel_id, slice_id, :, :])
 
 
-class CudaTimer:
-    def __init__(self):
+class Timer:
+    def __init__(self, device):
+        self.device = device
         self.start()
 
     def start(self):
@@ -71,7 +72,9 @@ class CudaTimer:
         self.timestamps = {}
 
     def stamp(self, name=None, from_start=False):
-        torch.cuda.current_stream().synchronize()
+        if self.device.type != "cpu":
+            torch.cuda.current_stream().synchronize()
+    
         new_time = time.time()
         if not from_start:
             dt = new_time - self.last_time

@@ -116,7 +116,10 @@ if __name__ == "__main__":
     print(f"Using dataset path {dataset_path}")
 
     # Get device
-    device = torch.device(args.device)
+    if args.device == 'cuda' and torch.cuda.is_available():
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
     print(f"Using device {device}")
 
     # Initialize a new context, or load from a file to resume training
