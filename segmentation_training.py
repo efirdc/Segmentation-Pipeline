@@ -239,6 +239,8 @@ class SegmentationTrainer:
                     print("Training time expired.")
                 break
 
+            context.iteration += 1
+
         print("Saving context...")
         save_context(checkpoints_folder)
 
