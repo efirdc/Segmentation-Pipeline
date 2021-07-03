@@ -169,9 +169,13 @@ class CustomSequentialLabels(LabelTransform):
                 unique_labels = list(image['label_values'].values())
                 unique_labels.sort()
             else:
-                unique_labels = torch.unique(image.data).tolist()
+                unique_labels = torch.unique(image.data, sorted=True).tolist()
+
+                # Remove the 0
+                unique_labels = unique_labels[1:]
+
             remapping = {
-                unique_labels[i]: (i + 1)
+                unique_labels[i]: i + 1
                 for i in range(len(unique_labels))
             }
             transform = CustomRemapLabels(
