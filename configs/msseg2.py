@@ -64,7 +64,7 @@ def get_context(device, variables, **kwargs):
     context.add_part("model", NestedResUNet, input_channels=2, output_channels=2,
                      filters=40, dropout_p=0.2, saggital_split=False)
     context.add_part("optimizer", Adam, params="self.model.parameters()", lr=0.001)
-    context.add_part("criterion", HybridLogisticDiceLoss)
+    context.add_part("criterion", HybridLogisticDiceLoss, logistic_weights=[1, 100])
 
     training_evaluators = [
         ScheduledEvaluation(evaluator=SegmentationEvaluator('y_pred_eval', 'y_eval'),
