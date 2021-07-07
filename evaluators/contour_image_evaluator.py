@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 import torch
 import matplotlib
-#matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 from PIL import Image
@@ -24,7 +24,7 @@ class ContourImageEvaluator(Evaluator):
             slice_id: int,
             legend: bool,
             ncol: int,
-            scale: float = 0.04,
+            scale: float = 0.1,
             line_width: float = 1.5,
     ):
         self.plane = plane
@@ -106,5 +106,4 @@ class ContourImageEvaluator(Evaluator):
         buf.seek(0)
         pil_image = Image.open(buf)
         plt.close(fig)
-        out = {"image": pil_image}
-        return out
+        return pil_image
