@@ -64,12 +64,14 @@ def slice_volume(x: torch.tensor, channel_id: int, plane: str, slice_id: int):
 class Timer:
     def __init__(self, device):
         self.device = device
-        self.start()
+
+        self.start_time = 0
+        self.last_time = 0
+        self.timestamps = {}
 
     def start(self):
-        self.start_time = time.time()
-        self.last_time = self.start_time
-        self.timestamps = {}
+        self.start_time = self.last_time = time.time()
+        self.timestamps = {stamp: 0.0 for stamp in self.timestamps.keys()}
 
     def stamp(self, name=None, from_start=False):
         if self.device.type != "cpu":
