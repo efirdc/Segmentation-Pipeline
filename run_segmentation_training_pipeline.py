@@ -3,7 +3,6 @@ import argparse
 import tarfile
 import shutil
 from pathlib import Path
-import wandb
 import torch
 
 from torch_context import TorchContext
@@ -53,11 +52,8 @@ if __name__ == "__main__":
                         help="Length of time to train for. Format: days-hours:minutes:seconds "
                              "Training may stop early if the number of iterations run out first."
                         )
-    parser.add_argument("--wandb_project", type=str, default="auto-segmentation",
+    parser.add_argument("--wandb_project", type=str, default="segmentation",
                         help="Project name for Weights and Biases logging service."
-                        )
-    parser.add_argument("--wandb_directory", type=str, default=None,
-                        help="Directory where wandb metadata will be stored."
                         )
     parser.add_argument("--preload_training_data", type=bool, default=False,
                         help="Optionally preload the entire training dataset into memory."
@@ -80,7 +76,7 @@ if __name__ == "__main__":
         extra_args[name[2:]] = value
 
     # Compute time when training should terminate.
-    # A buffer is used for saving the model (either 5 minutes or 10% of training time, whatever is smaller)
+    # A buffer is used for saving the model (either 5 minutes or 10% of training time, whichever is smaller)
     training_time = time_str_to_seconds(args.training_time)
     save_buffer = min(int(training_time * 0.1), 5 * 60)
     stop_time = time.time() + training_time - save_buffer
@@ -132,7 +128,7 @@ if __name__ == "__main__":
     context.init_components()
 
     print("entering training loop")
-    context.trainer.train(context, args.iterations, stop_time=stop_time, wandb_logging=True,
+    context.trainer.train(context, args.iterations, stop_time=stop_time, wandb_project=args.wandb_project,
                           preload_training_data=args.preload_training_data,
                           preload_validation_data=args.preload_validation_data,
                           validation_batch_size=args.validation_batch_size)

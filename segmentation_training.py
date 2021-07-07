@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 import torchio as tio
 from torchio.transforms.preprocessing.label.label_transform import LabelTransform
 import wandb
+from random_words import RandomWords
 
 from evaluators import *
 from data_processing import *
@@ -96,18 +97,49 @@ class SegmentationTrainer:
               preload_validation_data=False, validation_batch_size=16, wandb_project="segmentation",
               wandb_model_watch_rate=None, **kwargs):
 
-        # Initialize directories for saving models and images
-        save_folder = f'{self.save_folder}/{context.name}/'
-        image_folder = save_folder + "images/"
+        # Setup Weights and Biases logging service
+        print(f"initializing wandb")
+
+        wandb_params = {
+            'project': wandb_project,
+        }
+
+        # First time setup
+        if self.iteration == 0:
+            wandb_params['id'] = context.metadata["wandb_id"] = wandb.util.generate_id()
+            rw = RandomWords()
+            context.name = f'{context.name}-{rw.random_word()}-{rw.random_word()}-{context.metadata["wandb_id"]}'
+            wandb_params['config'] = context.get_config(('model', 'optimizer', 'criterion', "trainer"))
+
+        # Resuming
+        else:
+            wandb_params['id'] = context.metadata["wandb_id"]
+            wandb_params['resume'] = 'allow'
+
+        # Initialize directories for saving data
+        save_folder = f'{self.save_folder}/{wandb_project}/{context.name}/'
         checkpoints_folder = save_folder + "checkpoints/"
         best_checkpoints_folder = save_folder + "best_checkpoints/"
-        for folder in (image_folder, checkpoints_folder, best_checkpoints_folder):
+        for folder in (checkpoints_folder, best_checkpoints_folder):
             if not os.path.exists(folder):
                 os.makedirs(folder)
 
-        # Function for saving the context
-        def save_context(path):
-            context.save(f"{path}iter{context.iteration:08}.pt")
+        wandb_params['dir'] = save_folder
+        wandb.init(**wandb_params)
+
+        # Save code on first iteration
+        if self.iteration == 0:
+            for file_path in context.file_paths:
+                wandb.save(file_path)
+
+        # Save all the best checkpoints
+        wandb.save(best_checkpoints_folder + "*")
+
+        # Watch the model params/gradients (the output of this looks totally useless tbh)
+        if wandb_model_watch_rate:
+            wandb.watch(context.model, log='all', log_freq=wandb_model_watch_rate)
+
+        print(str(context))
 
         # Get the training_dataset
         training_dataset = context.dataset.get_cohort_dataset("training")
