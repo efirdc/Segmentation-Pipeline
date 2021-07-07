@@ -73,11 +73,28 @@ class SegmentationTrainer:
         self.validation_evaluators = validation_evaluators
         self.max_iterations_with_no_improvement = max_iterations_with_no_improvement
 
+        self.iteration = 0
         self.max_score = -1
         self.max_score_iteration = -1
 
-    def train(self, context, iterations, stop_time=None, wandb_logging=True, preload_training_data=False,
-              preload_validation_data=False, validation_batch_size=16):
+    def state_dict(self):
+        return {
+            'iteration': self.iteration,
+            'max_score': self.max_score,
+            'max_score_iteration': self.max_score_iteration,
+        }
+
+    def load_state_dict(self, state):
+        self.iteration = state['iteration']
+        self.max_score = state['max_score']
+        self.max_score_iteration = state['max_score_iteration']
+
+    def save_context(self, context, path):
+        context.save(f"{path}iter{self.iteration:08}.pt")
+
+    def train(self, context, iterations, stop_time=None, preload_training_data=False,
+              preload_validation_data=False, validation_batch_size=16, wandb_project="segmentation",
+              wandb_model_watch_rate=None, **kwargs):
 
         # Initialize directories for saving models and images
         save_folder = f'{self.save_folder}/{context.name}/'
@@ -163,7 +180,7 @@ class SegmentationTrainer:
             validation_evaluations = {}
             validation_evaluators = [
                 scheduled for scheduled in self.validation_evaluators
-                if context.iteration % scheduled.interval == 0
+                if self.iteration % scheduled.interval == 0
             ]
 
             # Run evaluations if at least one is scheduled
@@ -204,18 +221,18 @@ class SegmentationTrainer:
 
             log_dict = {**loss_dict, **training_evaluations, **validation_evaluations}
 
-            if context.iteration % self.save_rate == 0:
-                save_context(checkpoints_folder)
+            if self.iteration % self.save_rate == 0:
+                self.save_context(context, checkpoints_folder)
                 timer.stamp("save_checkpoint")
 
-            if context.iteration % self.scoring_interval == 0:
+            if self.iteration % self.scoring_interval == 0:
                 new_score = self.scoring_function(log_dict)
                 log_dict['model_score'] = new_score
 
                 if new_score > self.max_score:
                     self.max_score = new_score
-                    self.max_score_iteration = context.iteration
-                    save_context(best_checkpoints_folder)
+                    self.max_score_iteration = self.iteration
+                    self.save_context(context, best_checkpoints_folder)
                     timer.stamp("save_best_checkpoint")
 
             log_dict['timer'] = timer.timestamps
@@ -224,11 +241,9 @@ class SegmentationTrainer:
                 warnings.simplefilter("ignore")
                 wandb.log(to_wandb(log_dict))
 
-            context.iteration += 1
-
-            iterations_with_no_improvement = context.iteration - self.max_score_iteration
+            iterations_with_no_improvement = self.iteration - self.max_score_iteration
             if iterations_with_no_improvement > self.max_iterations_with_no_improvement:
-                print(f"Training stopped on iteration {context.iteration} due to not improving for "
+                print(f"Training stopped on iteration {self.iteration} due to not improving for "
                       f"{iterations_with_no_improvement} iterations.")
                 break
 
@@ -239,10 +254,10 @@ class SegmentationTrainer:
                     print("Training time expired.")
                 break
 
-            context.iteration += 1
+            self.iteration += 1
 
         print("Saving context...")
-        save_context(checkpoints_folder)
+        self.save_context(context, checkpoints_folder)
 
     def get_filter_from_scheduled_evaluations(
             self,

@@ -1,8 +1,10 @@
+import os
+
 import torchio as tio
 from torch.optim import Adam
 import torch
 
-from context import Context
+from torch_context import TorchContext
 from segmentation_training import SegmentationTrainer, ScheduledEvaluation
 from models import NestedResUNet
 from evaluation import HybridLogisticDiceLoss
@@ -11,8 +13,9 @@ from data_processing import *
 from evaluators import *
 
 
-def get_context(device, variables, **kwargs):
-    context = Context(device, name="msseg2", variables=variables)
+def get_context(device, variables, fold=0, **kwargs):
+    context = TorchContext(device, name="msseg2", variables=variables)
+    context.file_paths.append(os.path.abspath(__file__))
 
     input_images = ["flair_time01", "flair_time02"]
     output_labels = ["ground_truth"]
@@ -47,7 +50,7 @@ def get_context(device, variables, **kwargs):
         tio.RescaleIntensity((-1, 1.), (0.0, 99.5)),
         ConcatenateImages(image_names=["flair_time01", "flair_time02"], image_channels=[1, 1], new_image_name="X"),
         RenameProperty(old_name='ground_truth', new_name='y'),
-        CustomOneHot(include="y")
+        CustomOneHot(include="y"),
     ])
 
     transforms = {
@@ -59,12 +62,12 @@ def get_context(device, variables, **kwargs):
         ]),
     }
 
-    context.add_part("dataset", SubjectFolder, root='$DATASET_PATH', subject_path="",
-                     subject_loader=subject_loader, cohorts=cohorts, transforms=transforms)
-    context.add_part("model", NestedResUNet, input_channels=2, output_channels=2,
-                     filters=40, dropout_p=0.2, saggital_split=False)
-    context.add_part("optimizer", Adam, params="self.model.parameters()", lr=0.001)
-    context.add_part("criterion", HybridLogisticDiceLoss, logistic_weights=[1, 100])
+    context.add_component("dataset", SubjectFolder, root='$DATASET_PATH', subject_path="",
+                          subject_loader=subject_loader, cohorts=cohorts, transforms=transforms)
+    context.add_component("model", NestedResUNet, input_channels=2, output_channels=2,
+                          filters=40, dropout_p=0.2, saggital_split=False)
+    context.add_component("optimizer", Adam, params="self.model.parameters()", lr=0.001)
+    context.add_component("criterion", HybridLogisticDiceLoss, logistic_weights=[1, 100])
 
     training_evaluators = [
         ScheduledEvaluation(evaluator=SegmentationEvaluator('y_pred_eval', 'y_eval'),
@@ -108,10 +111,10 @@ def get_context(device, variables, **kwargs):
         score = dice
         return score
 
-    context.add_part("trainer", SegmentationTrainer, training_batch_size=1,
-                     save_folder="$CHECKPOINTS_PATH", save_rate=100, scoring_interval=50,
-                     scoring_function=scoring_function, one_time_evaluators=[],
-                     training_evaluators=training_evaluators, validation_evaluators=validation_evaluators,
-                     max_iterations_with_no_improvement=500)
+    context.add_component("trainer", SegmentationTrainer, training_batch_size=1,
+                          save_folder="$CHECKPOINTS_PATH", save_rate=100, scoring_interval=50,
+                          scoring_function=scoring_function, one_time_evaluators=[],
+                          training_evaluators=training_evaluators, validation_evaluators=validation_evaluators,
+                          max_iterations_with_no_improvement=500)
 
     return context

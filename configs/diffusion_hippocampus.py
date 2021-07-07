@@ -1,4 +1,6 @@
-from context import Context
+import os
+
+from torch_context import TorchContext
 import torchio as tio
 from segmentation_training import SegmentationTrainer, ScheduledEvaluation
 from models import NestedResUNet
@@ -11,7 +13,8 @@ from evaluators import *
 
 
 def get_context(device, variables, predict_hbt=False, **kwargs):
-    context = Context(device, name="dmri-hippo", variables=variables)
+    context = TorchContext(device, name="dmri-hippo", variables=variables)
+    context.file_paths.append(os.path.abspath(__file__))
 
     input_images = ["mean_dwi", "md", "fa"]
     output_labels = ["whole_roi", "hbt_roi"]
@@ -72,12 +75,12 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
         ]),
     }
 
-    context.add_part("dataset", SubjectFolder, root='$DATASET_PATH', subject_path="subjects",
-                     subject_loader=subject_loader, cohorts=cohorts, transforms=transforms)
-    context.add_part("model", NestedResUNet, input_channels=3, output_channels=4 if predict_hbt else 2,
-                     filters=40, dropout_p=0.2, saggital_split=True)
-    context.add_part("optimizer", Adam, params="self.model.parameters()", lr=0.0002)
-    context.add_part("criterion", HybridLogisticDiceLoss)
+    context.add_component("dataset", SubjectFolder, root='$DATASET_PATH', subject_path="subjects",
+                          subject_loader=subject_loader, cohorts=cohorts, transforms=transforms)
+    context.add_component("model", NestedResUNet, input_channels=3, output_channels=4 if predict_hbt else 2,
+                          filters=40, dropout_p=0.2, saggital_split=True)
+    context.add_component("optimizer", Adam, params="self.model.parameters()", lr=0.0002)
+    context.add_component("criterion", HybridLogisticDiceLoss)
 
     plot_subjects = ["cbbrain_042", "cbbrain_082", "cbbrain_143",
                      "cbbrain_036", "cbbrain_039", "cbbrain_190",  # FASD
@@ -138,10 +141,10 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
         score = cbbrain_dice + ab300_dice
         return score
 
-    context.add_part("trainer", SegmentationTrainer, training_batch_size=2,
-                     save_folder="$CHECKPOINTS_PATH", save_rate=100, scoring_interval=50,
-                     scoring_function=scoring_function, one_time_evaluators=one_time_evaluators,
-                     training_evaluators=training_evaluators,  validation_evaluators=validation_evaluators,
-                     max_iterations_with_no_improvement=500)
+    context.add_component("trainer", SegmentationTrainer, training_batch_size=2,
+                          save_folder="$CHECKPOINTS_PATH", save_rate=100, scoring_interval=50,
+                          scoring_function=scoring_function, one_time_evaluators=one_time_evaluators,
+                          training_evaluators=training_evaluators, validation_evaluators=validation_evaluators,
+                          max_iterations_with_no_improvement=500)
 
     return context

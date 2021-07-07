@@ -6,7 +6,7 @@ import os
 
 from post_processing import *
 
-from context import Context
+from torch_context import TorchContext
 
 
 def inference(context, args, i, log_callback=None):
@@ -107,7 +107,7 @@ if __name__ == "__main__":
         device = torch.device(args.device)
     print("using device", device)
 
-    context = Context(device, file_name=args.model_path, variables=dict(DATASET_FOLDER=args.dataset_path), include=['dataset', 'model'])
+    context = TorchContext(device, file_path=args.model_path, variables=dict(DATASET_FOLDER=args.dataset_path), include=['dataset', 'model'])
 
     # Fix torchio deprecating something...
     # fixed_transform = tio.Compose([

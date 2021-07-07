@@ -6,7 +6,7 @@ from pathlib import Path
 import wandb
 import torch
 
-from context import Context
+from torch_context import TorchContext
 from utils import load_module
 
 
@@ -126,36 +126,10 @@ if __name__ == "__main__":
     variables = dict(DATASET_PATH=str(dataset_path), CHECKPOINTS_PATH=args.checkpoints_path)
     if args.load_checkpoint is None:
         config = load_module(args.config)
-        context = config.get_context(device, variables)
+        context = config.get_context(device, variables, **extra_args)
     else:
-        context = Context(device, file_name=args.load_checkpoint, variables=variables, globals=globals())
-
-    # Setup Weights and Biases logging service
-    print(f"initializing wandb")
-    wandb_params = dict(project=args.wandb_project, dir=args.wandb_directory)
-    if "wandb_id" in context.info:
-        wandb_params["id"] = context.info["wandb_id"]
-        wandb_params["resume"] = "allow"
-    else:
-        wandb_params["id"] = context.info["wandb_id"] = wandb.util.generate_id()
-    wandb.init(**wandb_params)
-
-    '''
-    for i in range(100):
-        try:
-            wandb.init(project=args.wandb_project, **wandb_params)
-            break
-        except:
-            print(f"wandb init failed. retrying...")
-            time.sleep(10)
-        raise TimeoutError("max wandb init attempts reached.")
-    '''
-
-    if not context.name.endswith(wandb.run.name):
-        print(f"Appending wandb run name to context name.")
-        context.name += '-' + wandb.run.name
-
-    print(str(context))
+        context = TorchContext(device, file_path=args.load_checkpoint, variables=variables)
+    context.init_components()
 
     print("entering training loop")
     context.trainer.train(context, args.iterations, stop_time=stop_time, wandb_logging=True,

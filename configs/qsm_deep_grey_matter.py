@@ -1,4 +1,4 @@
-from context import Context
+from torch_context import TorchContext
 import torchio as tio
 from data_processing.subject_folder import SubjectFolder
 from segmentation_training import SegmentationTrainer
@@ -11,7 +11,7 @@ from transforms import *
 
 
 def get_context(device, variables, **kwargs):
-    context = Context(device, name="qsm-dgm", variables=variables)
+    context = TorchContext(device, name="qsm-dgm", variables=variables)
 
     image_definitions = [
         ImageDefinition(name="t1", glob_pattern="MPRAGE.*"),
@@ -59,24 +59,24 @@ def get_context(device, variables, **kwargs):
     dataset_params = dict(path="$DATASET_PATH", image_definitions=image_definitions,
                           label_definitions=label_definitions, collate_attributes=["X", "y"], require_images=True)
 
-    context.add_part("dataset", SubjectFolder, exclude_subjects=val_subjects, transforms=transforms,
-                     **dataset_params)
-    context.add_part("val_dataset", SubjectFolder, include_subjects=val_subjects, transforms=val_transforms,
-                     **dataset_params)
+    context.add_component("dataset", SubjectFolder, exclude_subjects=val_subjects, transforms=transforms,
+                          **dataset_params)
+    context.add_component("val_dataset", SubjectFolder, include_subjects=val_subjects, transforms=val_transforms,
+                          **dataset_params)
 
-    context.add_part("datasampler", RandomSampler, data_source="self.dataset")
-    context.add_part("dataloader", DataLoader, dataset="self.dataset", batch_size=4, sampler="self.datasampler",
-                     drop_last=False, collate_fn="self.dataset.collate", pin_memory=False, num_workers=0,
-                     persistent_workers=False)
-    context.add_part("model", NestedResUNet, input_channels=2, output_channels=10, filters=40, dropout_p=0.2,
-                     saggital_split=False)
-    context.add_part("optimizer", Adam, params="self.model.parameters()", lr=0.0002)
-    context.add_part("criterion", HybridLogisticDiceLoss)
-    context.add_part("trainer", SegmentationTrainer, save_folder="$CHECKPOINTS_PATH", sample_rate=50, save_rate=250,
-                     val_datasets=[
+    context.add_component("datasampler", RandomSampler, data_source="self.dataset")
+    context.add_component("dataloader", DataLoader, dataset="self.dataset", batch_size=4, sampler="self.datasampler",
+                          drop_last=False, collate_fn="self.dataset.collate", pin_memory=False, num_workers=0,
+                          persistent_workers=False)
+    context.add_component("model", NestedResUNet, input_channels=2, output_channels=10, filters=40, dropout_p=0.2,
+                          saggital_split=False)
+    context.add_component("optimizer", Adam, params="self.model.parameters()", lr=0.0002)
+    context.add_component("criterion", HybridLogisticDiceLoss)
+    context.add_component("trainer", SegmentationTrainer, save_folder="$CHECKPOINTS_PATH", sample_rate=50, save_rate=250,
+                          val_datasets=[
                          dict(dataset="self.val_dataset", log_prefix="Val", preload=True, interval=50),
                      ],
-                     val_images=[
+                          val_images=[
                          dict(interval=50, log_name="image0",
                               plane="Axial", image_name="qsm", slice=9, legend=True, ncol=1,
                               subjects=val_subjects),
