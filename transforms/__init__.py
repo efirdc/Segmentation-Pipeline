@@ -6,3 +6,4 @@ from .rename_image import RenameProperty
 from .split_image import SplitImage
 from .crop_to_mask import CropToMask
 from .set_data_type import SetDataType
+from .find_interesting_slice import FindInterestingSlice

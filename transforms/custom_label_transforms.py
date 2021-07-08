@@ -219,6 +219,8 @@ class CustomOneHot(LabelTransform):
             one_hot = F.one_hot(data.long(), num_classes=num_classes)
             image.set_data(one_hot.permute(3, 0, 1, 2).type(data.type()))
 
+            image['one_hot'] = True
+
         return subject
 
     def is_invertible(self):
@@ -244,6 +246,8 @@ class CustomArgMax(LabelTransform):
         for image in self.get_images(subject):
             new_data = torch.argmax(image.data, dim=0, keepdim=True)
             image.set_data(new_data)
+
+            image['one_hot'] = False
 
         return subject
 
