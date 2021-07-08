@@ -138,7 +138,7 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
         ab300_dice = mean(ab300_dice.values())
 
         # Model must perform equally well on cbbrain and ab300
-        score = cbbrain_dice + ab300_dice
+        score = (cbbrain_dice + ab300_dice) / 2
         return score
 
     context.add_component("trainer", SegmentationTrainer, training_batch_size=2,
