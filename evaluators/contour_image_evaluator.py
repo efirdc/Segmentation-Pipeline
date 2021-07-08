@@ -3,8 +3,6 @@ import warnings
 
 import numpy as np
 import torch
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 from PIL import Image
