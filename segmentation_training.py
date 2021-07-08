@@ -90,8 +90,11 @@ class SegmentationTrainer:
         self.max_score = state['max_score']
         self.max_score_iteration = state['max_score_iteration']
 
-    def save_context(self, context, path):
-        context.save(f"{path}iter{self.iteration:08}.pt")
+    def save_context(self, context, save_path, sub_folder, wandb_save=False):
+        file_path = os.path.join(save_path, sub_folder, f"iter{self.iteration:08}.pt")
+        context.save(file_path)
+        if wandb_save:
+            wandb.save(file_path)
 
     def train(self, context, iterations, stop_time=None, preload_training_data=False,
               preload_validation_data=False, validation_batch_size=16, wandb_project="segmentation",
@@ -117,12 +120,13 @@ class SegmentationTrainer:
             wandb_params['resume'] = 'allow'
 
         # Initialize directories for saving data
-        save_folder = f'{self.save_folder}/{wandb_project}/{context.name}/'
-        checkpoints_folder = save_folder + "checkpoints/"
-        best_checkpoints_folder = save_folder + "best_checkpoints/"
-        for folder in (checkpoints_folder, best_checkpoints_folder):
-            if not os.path.exists(folder):
-                os.makedirs(folder)
+        save_folder = os.path.join(self.save_folder, wandb_project, context.name)
+        checkpoints_folder = "checkpoints/"
+        best_checkpoints_folder = "best_checkpoints/"
+        for sub_folder in (checkpoints_folder, best_checkpoints_folder):
+            sub_dir = os.path.join(save_folder, sub_folder)
+            if not os.path.exists(sub_dir):
+                os.makedirs(sub_dir)
 
         wandb_params['dir'] = save_folder
         wandb.init(**wandb_params)
@@ -131,9 +135,6 @@ class SegmentationTrainer:
         if self.iteration == 0:
             for file_path in context.file_paths:
                 wandb.save(file_path)
-
-        # Save all the best checkpoints
-        wandb.save(best_checkpoints_folder + "*")
 
         # Watch the model params/gradients (the output of this looks totally useless tbh)
         if wandb_model_watch_rate:
@@ -254,7 +255,7 @@ class SegmentationTrainer:
             log_dict = {**loss_dict, **training_evaluations, **validation_evaluations}
 
             if self.iteration % self.save_rate == 0:
-                self.save_context(context, checkpoints_folder)
+                self.save_context(context, save_folder, checkpoints_folder, wandb_save=False)
                 timer.stamp("save_checkpoint")
 
             if self.iteration % self.scoring_interval == 0:
@@ -264,7 +265,7 @@ class SegmentationTrainer:
                 if new_score > self.max_score:
                     self.max_score = new_score
                     self.max_score_iteration = self.iteration
-                    self.save_context(context, best_checkpoints_folder)
+                    self.save_context(context, save_folder, best_checkpoints_folder, wandb_save=True)
                     timer.stamp("save_best_checkpoint")
 
             log_dict['timer'] = timer.timestamps
@@ -289,7 +290,7 @@ class SegmentationTrainer:
             self.iteration += 1
 
         print("Saving context...")
-        self.save_context(context, checkpoints_folder)
+        self.save_context(context, save_folder, checkpoints_folder, wandb_save=True)
 
     def get_filter_from_scheduled_evaluations(
             self,
