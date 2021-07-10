@@ -1,11 +1,10 @@
 from typing import Sequence
 
 import torch
-import torchio as tio
 import pandas as pd
 
-from transforms import *
 from .evaluator import Evaluator
+from utils import as_list
 
 
 class SegmentationEvaluator(Evaluator):
@@ -57,74 +56,86 @@ class SegmentationEvaluator(Evaluator):
         self.stats_to_output = stats_to_output
         self.summary_stats_to_output = summary_stats_to_output
 
+        if self.stats_to_output is None:
+            self.stats_to_output = ('TP', 'FP', 'TN', 'FN', 'dice', 'jaccard', 'sensitivity',
+                                    'specificity', 'precision', 'recall')
+        if self.summary_stats_to_output is None:
+            self.summary_stats_to_output = ('mean', 'median', 'mode', 'std', 'min', 'max')
+
     def __call__(self, subjects):
         label_values = subjects[0][self.prediction_label_map_name]['label_values']
         label_names = list(label_values.keys())
         subject_names = [subject['name'] for subject in subjects]
 
-        # Transform and stack prediction and target labels into one-hot (N, C, W, H, D) tensors
-        prediction_label = torch.stack([
-            subject[self.prediction_label_map_name].data for subject in subjects
-        ]).bool()
-        target_label = torch.stack([
-            subject[self.target_label_map_name].data for subject in subjects
-        ]).bool()
-
-        # Compute (N, C) tensors for each statistic. Each element corresponds to one subject and one label.
-        spatial_dims = (2, 3, 4)
-        TP = (target_label & prediction_label).sum(dim=spatial_dims)
-        FP = (~target_label & prediction_label).sum(dim=spatial_dims)
-        TN = (~target_label & ~prediction_label).sum(dim=spatial_dims)
-        FN = (target_label & ~prediction_label).sum(dim=spatial_dims)
-
-        stats = {
-            'TP': TP,
-            'FP': FP,
-            'TN': TN,
-            'FN': FN,
-            'dice': 2 * TP / (2 * TP + FP + FN),
-            'jaccard': TP / (TP + FP + FN),
-            'sensitivity': TP / (TP + FN),
-            'specificity': TN / (TN + FP),
-            'precision': TP / (TP + FP),
-            'recall': TP / (TP + FN)
+        subject_stats = {
+            subject_name: {
+                label_name: None
+                for label_name in label_names
+            }
+            for subject_name in subject_names
         }
 
-        out_dict = {}
-        summary_stat_funcs = self.get_summary_stat_funcs()
+        for subject in subjects:
+            pred_data = subject[self.prediction_label_map_name].data.bool()
+            target_data = subject[self.target_label_map_name].data.bool()
 
-        stats_to_output = self.stats_to_output
-        if stats_to_output is None:
-            stats_to_output = list(stats.keys())
-        summary_stats_to_output = self.summary_stats_to_output
-        if summary_stats_to_output is None:
-            summary_stats_to_output = list(summary_stat_funcs.keys())
+            # Compute tensors for each statistic. Each element corresponds to one label.
+            spatial_dims = (1, 2, 3)
+            TP = (target_data & pred_data).sum(dim=spatial_dims)
+            FP = (~target_data & pred_data).sum(dim=spatial_dims)
+            TN = (~target_data & ~pred_data).sum(dim=spatial_dims)
+            FN = (target_data & ~pred_data).sum(dim=spatial_dims)
 
-        # Convert the stats dict to a summary stats dict,
-        # i.e. apply the summary stat functions on the subject axis for each (N, C) stat tensor,
+            stats = {
+                'TP': TP,
+                'FP': FP,
+                'TN': TN,
+                'FN': FN,
+                'dice': 2 * TP / (2 * TP + FP + FN),
+                'jaccard': TP / (TP + FP + FN),
+                'sensitivity': TP / (TP + FN),
+                'specificity': TN / (TN + FP),
+                'precision': TP / (TP + FP),
+                'recall': TP / (TP + FN)
+            }
+
+            for label_name, label_value in label_values.items():
+                subject_stats[subject['name']][label_name] = {
+                    stat_name: stat_value[label_value]
+                    for stat_name, stat_value in stats.items()
+                }
+
         # Recall that the desired form is
         # {summary_stat_name: {stat_name: {label_name: value}}}
-        out_dict['summary_stats'] = {
+        summary_stats = {
             summary_stat_name: {
                 stat_name: {
-                    label_name: func(stat[:, label_value].float()).tolist()
-                    for label_name, label_value in label_values.items()
+                    label_name: None for label_name in label_names
                 }
-                for stat_name, stat in stats.items()
-                if stat_name in stats_to_output
+                for stat_name in self.stats_to_output
             }
-            for summary_stat_name, func in summary_stat_funcs.items()
-            if summary_stat_name in summary_stats_to_output
+            for summary_stat_name in self.summary_stats_to_output
         }
 
-        # df is a pd.DataFrame with col=stat_name row_index=subject_name
         df = pd.DataFrame()
         df['subject'] = subject_names
 
-        for label_name, label_value in label_values.items():
-            for stat_name in stats_to_output:
-                df[f'{stat_name}.{label_name}'] = stats[stat_name][:, label_value]
+        summary_stat_funcs = self.get_summary_stat_funcs()
 
-        out_dict['subject_stats'] = df
+        for summary_stat_name in self.summary_stats_to_output:
+            for stat_name in self.stats_to_output:
+                for label_name in label_names:
+                    subject_values = torch.tensor([
+                        subject_stats[subject_name][label_name][stat_name]
+                        for subject_name in subject_names
+                    ]).float()
+
+                    summary_stat_func = summary_stat_funcs[summary_stat_name]
+                    summary_stat = summary_stat_func(subject_values).float()
+                    summary_stats[summary_stat_name][stat_name][label_name] = summary_stat
+
+                    df[f'{stat_name}.{label_name}'] = subject_values
+
+        out_dict = {'subject_stats': df, 'summary_stats': summary_stats}
 
         return out_dict
