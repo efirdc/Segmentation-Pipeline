@@ -67,6 +67,7 @@ class TorchContext:
         self.creation_time = datetime.now().strftime("%y%m%d-%H%M%S")
         self.component_definitions = []
         self.file_paths = []
+        self.config = {}
 
         if file_path is not None:
             checkpoint = torch.load(file_path)
@@ -74,6 +75,7 @@ class TorchContext:
             self.name = checkpoint["name"]
             self.component_definitions = checkpoint['component_definitions']
             self.creation_time = checkpoint["creation_time"]
+            self.config = checkpoint['config'] if 'config' in checkpoint else {}
 
             for var, value in checkpoint["variables"].items():
                 if var not in self.variables and var not in os.environ:
@@ -197,7 +199,8 @@ class TorchContext:
             creation_time=self.creation_time,
             variables=self.variables,
             file_paths=self.file_paths,
-            metadata=self.metadata
+            metadata=self.metadata,
+            config=self.config,
         )
 
         torch.save(checkpoint, filename, pickle_module=dill)
@@ -206,11 +209,11 @@ class TorchContext:
         if self.loaded:
             raise NotImplementedError("Modifying components after they are initialized is not supported.")
 
-    def get_config(self, component_names):
-        out = {}
+    def get_config(self, component_names=None):
+        out = self.config.copy()
 
         for defn in self.component_definitions:
-            if defn['name'] not in component_names:
+            if component_names and defn['name'] not in component_names:
                 continue
             out.update({
                 f"{defn['name']}.{param}": value
