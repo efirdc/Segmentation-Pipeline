@@ -1,4 +1,5 @@
 import io
+import random
 import warnings
 
 import numpy as np
@@ -8,6 +9,7 @@ from matplotlib.cm import get_cmap
 from PIL import Image
 from torchvision.utils import make_grid
 
+from transforms import FindInterestingSlice
 from utils import slice_volume
 from .evaluator import Evaluator
 
@@ -24,7 +26,8 @@ class ContourImageEvaluator(Evaluator):
             ncol: int,
             scale: float = 0.1,
             line_width: float = 1.5,
-            interesting_slice: bool = False
+            interesting_slice: bool = False,
+            split_subjects: bool = False,
     ):
         self.plane = plane
         self.image_name = image_name
@@ -36,37 +39,68 @@ class ContourImageEvaluator(Evaluator):
         self.scale = scale
         self.line_width = line_width
         self.interesting_slice = interesting_slice
+        self.split_subjects = split_subjects
 
     def get_slice_id(self, subject):
+
+        if self.plane.lower() == 'random':
+            plane = ("Axial", "Coronal", "Saggital")[random.randint(0, 2)]
+        else:
+            plane = self.plane
+
         if not self.interesting_slice:
-            return self.slice_id
+            return self.slice_id, plane
 
         image = subject[self.target_label_map_name]
 
+        if 'interesting_slice_ids' not in image:
+            image = FindInterestingSlice()(image)
+
+        interesting_slice_ids = image['interesting_slice_ids']
+        interesting_slice_counts = image['interesting_slice_counts']
+        if plane.lower() == 'interesting':
+            count = -1
+            for check_plane in ("Axial", "Coronal", "Saggital"):
+                new_count = self.get_slice_property(image, interesting_slice_counts, self.slice_id, check_plane)
+                if new_count > count:
+                    plane = check_plane
+                    count = new_count
+        else:
+            plane = plane
+
+        return self.get_slice_property(image, interesting_slice_ids, self.slice_id, plane), plane
+
+    def get_slice_property(self, image, slice_property, slice_id, plane):
         _, W, H, D = image.data.shape
-        dim = {'Axial': D, 'Coronal': H, 'Saggital': W}[self.plane]
+        dim = {'Axial': D, 'Coronal': H, 'Saggital': W}[plane]
 
-        interesting_slice_ids = image['interesting_slice_ids'][self.plane]
-        if interesting_slice_ids.shape[0] == 0:
+        if slice_property[plane].shape[0] == 0:
             return dim // 2
-
-        if self.slice_id >= interesting_slice_ids.shape[0]:
-            return interesting_slice_ids[-1]
-
-        return interesting_slice_ids[self.slice_id]
+        if slice_id >= slice_property[plane].shape[0]:
+            return slice_property[plane][-1]
+        return slice_property[plane][slice_id]
 
     def slice_and_make_grid(self, subjects, image_name, channel, impute_shape, pad_value=0):
         slices = []
         for subject in subjects:
-            slice_id = self.get_slice_id(subject)
+            slice_id, plane = self.get_slice_id(subject)
             if image_name in subject:
-                slices.append(slice_volume(subject[image_name].data, channel, self.plane, slice_id).unsqueeze(0))
+                slices.append(slice_volume(subject[image_name].data, channel, plane, slice_id).unsqueeze(0))
             else:
                 slices.append(torch.zeros(impute_shape))
 
         return make_grid(slices, nrow=self.ncol, pad_value=pad_value, padding=1)[0].cpu()
 
     def __call__(self, subjects):
+        if not self.split_subjects:
+            return self.get_image(subjects)
+        else:
+            return {
+                subject['name']: self.get_image([subject])
+                for subject in subjects
+            }
+
+    def get_image(self, subjects):
         out_pred = self.prediction_label_map_name is not None
         out_target = self.target_label_map_name is not None
 
@@ -75,7 +109,9 @@ class ContourImageEvaluator(Evaluator):
         if out_target:
             label_values = subjects[0][self.target_label_map_name]['label_values']
 
-        sample_slice = slice_volume(subjects[0][self.image_name].data, 0, self.plane, 0)
+        sample_subject = subjects[0]
+        slice_id, plane = self.get_slice_id(sample_subject)
+        sample_slice = slice_volume(sample_subject[self.image_name].data, 0, plane, 0)
         impute_shape = sample_slice.shape
 
         img = self.slice_and_make_grid(subjects, self.image_name, 0, impute_shape, pad_value=-1)

@@ -28,10 +28,12 @@ class FindInterestingSlice(tio.Transform):
             planes = ('Saggital', 'Coronal', 'Axial')
 
             image['interesting_slice_ids'] = interesting_slice_ids = {}
+            image['interesting_slice_counts'] = interesting_slice_counts = {}
             for plane, where in zip(planes, torch.where(mask)):
                 slice_ids, counts = torch.unique(where, return_counts=True)
                 interesting_slice_ids_ids = torch.argsort(counts, descending=True)
                 interesting_slice_ids[plane] = slice_ids[interesting_slice_ids_ids]
+                interesting_slice_counts[plane] = counts[interesting_slice_ids_ids]
 
         return subject
 
