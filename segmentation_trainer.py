@@ -2,21 +2,20 @@ import time
 import os
 import signal
 import threading
-from typing import Sequence, Callable, Union
+from typing import Sequence, Callable, Union, Tuple
 import copy
-import warnings
 
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 import torchio as tio
 from torchio.transforms.preprocessing.label.label_transform import LabelTransform
-import wandb
-from random_words import RandomWords
+from torchio.data.sampler.sampler import PatchSampler
 
 from evaluators import *
 from data_processing import *
+from loggers import *
 from transforms import *
-from utils import Timer, dict_to_device, filter_transform, to_wandb
+from utils import Timer, filter_transform, collate_subjects
 
 
 EXIT = threading.Event()
@@ -41,7 +40,7 @@ class ScheduledEvaluation:
             log_name: str,
             cohorts: Sequence[str] = None,
             subjects: Sequence[str] = None,
-            interval: int = None,
+            interval: int = 1,
     ):
         assert not (cohorts and subjects), "One of cohorts or subjects may be provided, but not both."
         self.evaluator = evaluator
@@ -54,7 +53,6 @@ class ScheduledEvaluation:
 class SegmentationTrainer:
     def __init__(
             self,
-            save_folder: str,
             training_batch_size: int,
             save_rate: int,
             scoring_interval: int,
@@ -62,9 +60,15 @@ class SegmentationTrainer:
             one_time_evaluators: Sequence[ScheduledEvaluation],
             training_evaluators: Sequence[ScheduledEvaluation],
             validation_evaluators: Sequence[ScheduledEvaluation],
-            max_iterations_with_no_improvement: int
+            max_iterations_with_no_improvement: int,
+            enable_patch_mode: bool = False,
+            patch_size: Union[int, Tuple[int, int, int]] = None,
+            training_patch_sampler: PatchSampler = None,
+            training_patches_per_volume: int = None,
+            inference_patch_overlap: Union[int, Tuple[int, int, int]] = None,
+            inference_padding_mode: Union[str, float, None] = None,
+            inference_overlap_mode: str = 'average',
     ):
-        self.save_folder = save_folder
         self.training_batch_size = training_batch_size
         self.save_rate = save_rate
         self.scoring_interval = scoring_interval
@@ -73,6 +77,13 @@ class SegmentationTrainer:
         self.training_evaluators = training_evaluators
         self.validation_evaluators = validation_evaluators
         self.max_iterations_with_no_improvement = max_iterations_with_no_improvement
+        self.enable_patch_mode = enable_patch_mode
+        self.patch_size = patch_size
+        self.training_patch_sampler = training_patch_sampler
+        self.training_patches_per_volume = training_patches_per_volume
+        self.inference_patch_overlap = inference_patch_overlap
+        self.inference_padding_mode = inference_padding_mode
+        self.inference_overlap_mode = inference_overlap_mode
 
         self.iteration = 0
         self.max_score = -1
@@ -90,61 +101,23 @@ class SegmentationTrainer:
         self.max_score = state['max_score']
         self.max_score_iteration = state['max_score_iteration']
 
-    def save_context(self, context, save_path, sub_folder, wandb_save=False):
-        file_path = os.path.join(save_path, sub_folder, f"iter{self.iteration:08}.pt")
-        context.save(file_path)
-        if wandb_save:
-            wandb.save(file_path)
-
-    def train(self, context, iterations, stop_time=None, preload_training_data=False,
-              preload_validation_data=False, validation_batch_size=16, wandb_project="segmentation",
-              wandb_model_watch_rate=None, **kwargs):
-
-        # Setup Weights and Biases logging service
-        print(f"initializing wandb")
-
-        wandb_params = {
-            'project': wandb_project,
-        }
-
-        # First time setup
-        if self.iteration == 0:
-            wandb_params['id'] = context.metadata["wandb_id"] = wandb.util.generate_id()
-            rw = RandomWords()
-            context.name = f'{context.name}-{rw.random_word()}-{rw.random_word()}-{context.metadata["wandb_id"]}'
-            wandb_params['config'] = context.get_config(('model', 'optimizer', 'criterion', "trainer"))
-
-        # Resuming
-        else:
-            wandb_params['id'] = context.metadata["wandb_id"]
-            wandb_params['resume'] = 'allow'
-
-        # Initialize directories for saving data
-        save_folder = os.path.join(self.save_folder, wandb_project, context.name)
-        checkpoints_folder = "checkpoints/"
-        best_checkpoints_folder = "best_checkpoints/"
-        for sub_folder in (checkpoints_folder, best_checkpoints_folder):
-            sub_dir = os.path.join(save_folder, sub_folder)
-            if not os.path.exists(sub_dir):
-                os.makedirs(sub_dir)
-
-        wandb_params['dir'] = save_folder
-        wandb.init(**wandb_params)
-
-        # Save code on first iteration
-        if self.iteration == 0:
-            for file_path in context.file_paths:
-                wandb.save(file_path)
-
-        # Watch the model params/gradients (the output of this looks totally useless tbh)
-        if wandb_model_watch_rate:
-            wandb.watch(context.model, log='all', log_freq=wandb_model_watch_rate)
-
-        print(str(context))
+    def train(
+            self,
+            context,
+            iterations,
+            stop_time=None,
+            preload_training_data=False,
+            preload_validation_data=False,
+            num_workers=0,
+            validation_batch_size=16,
+            validation_patch_batch_size=32,
+            logger=NonLogger(),
+            **kwargs
+    ):
+        logger.setup(context)
 
         # Get the training_dataset
         training_dataset = context.dataset.get_cohort_dataset("training")
-        training_dataset.collate_attributes += ['X', 'y']
         if preload_training_data:
             t = time.time()
             print("Preloading training data...")
@@ -154,27 +127,38 @@ class SegmentationTrainer:
         # Infer the validation_dataset from scheduled evaluations
         validation_filter = self.get_filter_from_scheduled_evaluations(context.dataset, self.validation_evaluators)
         validation_dataset = context.dataset.get_cohort_dataset(validation_filter)
-        validation_dataset.collate_attributes += ['X']
         if preload_validation_data:
             t = time.time()
             print("Preloading validation data...")
             validation_dataset.preload_and_transform_subjects()
             print(f"Done. Took {round(time.time() - t, 2)}s")
 
+        def dont_collate(subjects):
+            return subjects
+
         # Make dataloaders for training and validation datasets
-        training_dataloader = DataLoader(dataset=training_dataset, batch_size=self.training_batch_size,
-                                         sampler=RandomSampler(training_dataset),
-                                         collate_fn=training_dataset.collate)
-        validation_dataloader = DataLoader(dataset=validation_dataset, batch_size=validation_batch_size,
-                                           sampler=SequentialSampler(validation_dataset),
-                                           collate_fn=validation_dataset.collate)
+        if not self.enable_patch_mode:
+            training_dataloader = DataLoader(dataset=training_dataset,
+                                             batch_size=self.training_batch_size,
+                                             sampler=RandomSampler(training_dataset),
+                                             collate_fn=dont_collate,
+                                             num_workers=num_workers)
+        else:
+            queue = tio.Queue(training_dataset,
+                              max_length=20,
+                              samples_per_volume=self.training_patches_per_volume,
+                              sampler=self.training_patch_sampler,
+                              num_workers=num_workers)
+            training_dataloader = DataLoader(dataset=queue,
+                                             batch_size=self.training_batch_size,
+                                             collate_fn=dont_collate)
 
         # Make an iterator for the training dataset
-        def get_data_sampler(loader):
+        def get_data_iterator(loader):
             while True:
                 for batch in loader:
                     yield batch
-        training_data_sampler = get_data_sampler(training_dataloader)
+        training_data_iterator = get_data_iterator(training_dataloader)
 
         # Grab an instance of the target label from the training dataset.
         # Some subjects in the validation set might not have it, so this is used to fill in attributes
@@ -186,16 +170,15 @@ class SegmentationTrainer:
         for _ in range(iterations):
             timer.start()
 
-            batch = next(training_data_sampler)
-            batch['X']['data'] = batch['X']['data'].to(context.device)
-            batch['y']['data'] = batch['y']['data'].to(context.device)
+            subjects = next(training_data_iterator)
+            batch = collate_subjects(subjects, image_names=['X', 'y'], device=context.device)
             timer.stamp("data_loading")
 
             context.model.train()
-            self.seg_predict(context.model, batch, y_sample)
+            self.seg_predict(context.model, batch, subjects, y_sample)
             timer.stamp("model_forward")
 
-            loss_dict = context.criterion(batch['y_pred']['data'], batch['y']['data'])
+            loss_dict = context.criterion(batch['y_pred'], batch['y'])
             timer.stamp("loss_function")
 
             context.optimizer.zero_grad()
@@ -205,8 +188,12 @@ class SegmentationTrainer:
             timer.stamp("model_backward")
 
             training_evaluations = {}
-            for scheduled in self.training_evaluators:
-                training_evaluations[scheduled.log_name] = scheduled.evaluator(batch['subjects'])
+            training_evaluators = [
+                scheduled for scheduled in self.training_evaluators
+                if self.iteration % scheduled.interval == 0
+            ]
+            for scheduled in training_evaluators:
+                training_evaluations[scheduled.log_name] = scheduled.evaluator(subjects)
                 timer.stamp(f"evaluation.{scheduled.log_name}")
 
             # Determine which scheduled evaluators should run this iteration
@@ -220,14 +207,43 @@ class SegmentationTrainer:
             if len(validation_evaluators) > 0:
 
                 # Run every subject that is scheduled to be evaluated through the model
-                validation_filter = self.get_filter_from_scheduled_evaluations(validation_dataset, validation_evaluators)
-                validation_dataset.set_cohort(validation_filter)
+                validation_filter = self.get_filter_from_scheduled_evaluations(context.dataset, validation_evaluators)
+                validation_dataset = context.dataset.get_cohort_dataset(validation_filter)
+                validation_dataloader = DataLoader(dataset=validation_dataset,
+                                                   batch_size=validation_batch_size,
+                                                   sampler=SequentialSampler(validation_dataset),
+                                                   collate_fn=dont_collate,
+                                                   num_workers=num_workers)
                 validation_subjects = []
-                for batch in validation_dataloader:
-                    batch['X']['data'] = batch['X']['data'].to(context.device)
-                    with torch.no_grad():
-                        self.seg_predict(context.model, batch, y_sample)
-                    validation_subjects += batch['subjects']
+
+                for subjects in validation_dataloader:
+                    if not self.enable_patch_mode:
+                        batch = collate_subjects(subjects, image_names=['X'], device=context.device)
+                        with torch.no_grad():
+                            self.seg_predict(context.model, batch, subjects, y_sample)
+                        validation_subjects += subjects
+                    else:
+                        for subject in subjects:
+                            grid_sampler = tio.GridSampler(subject,
+                                                           self.patch_size,
+                                                           self.inference_patch_overlap,
+                                                           self.inference_padding_mode)
+                            patch_loader = DataLoader(grid_sampler,
+                                                      batch_size=validation_patch_batch_size,
+                                                      collate_fn=dont_collate)
+                            aggregator = tio.GridAggregator(grid_sampler, overlap_mode=self.inference_overlap_mode)
+                            for subject_patches in patch_loader:
+                                locations = torch.stack([patch['location'] for patch in subject_patches])
+                                batch = collate_subjects(subject_patches, image_names=['X'], device=context.device)
+                                with torch.no_grad():
+                                    y_pred_patch = context.model(batch['X'])
+                                aggregator.add_batch(y_pred_patch, locations)
+                            y_pred = copy.deepcopy(y_sample)
+                            y_pred.set_data(aggregator.get_output_tensor().cpu())
+                            subject['y_pred'] = y_pred
+                            self.add_evaluation_labels(subject)
+                            validation_subjects.append(subject)
+
                 validation_subjects_map = {subject['name']: subject for subject in validation_subjects}
                 timer.stamp('model_forward_evaluation')
 
@@ -255,7 +271,7 @@ class SegmentationTrainer:
             log_dict = {**loss_dict, **training_evaluations, **validation_evaluations}
 
             if self.iteration % self.save_rate == 0:
-                self.save_context(context, save_folder, checkpoints_folder, wandb_save=False)
+                logger.save_context(context, "checkpoints/", self.iteration)
                 timer.stamp("save_checkpoint")
 
             if self.iteration % self.scoring_interval == 0:
@@ -265,14 +281,12 @@ class SegmentationTrainer:
                 if new_score > self.max_score:
                     self.max_score = new_score
                     self.max_score_iteration = self.iteration
-                    self.save_context(context, save_folder, best_checkpoints_folder, wandb_save=True)
+                    logger.save_context(context, "best_checkpoints/", self.iteration)
                     timer.stamp("save_best_checkpoint")
 
             log_dict['timer'] = timer.timestamps
 
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                wandb.log(to_wandb(log_dict))
+            logger.log(log_dict)
 
             iterations_with_no_improvement = self.iteration - self.max_score_iteration
             if iterations_with_no_improvement > self.max_iterations_with_no_improvement:
@@ -290,7 +304,7 @@ class SegmentationTrainer:
             self.iteration += 1
 
         print("Saving context...")
-        self.save_context(context, save_folder, checkpoints_folder, wandb_save=True)
+        logger.save_context(context, "checkpoints/", self.iteration)
 
     def get_filter_from_scheduled_evaluations(
             self,
@@ -308,29 +322,32 @@ class SegmentationTrainer:
         subject_filter = AnyFilter(filters)
         return subject_filter
 
-    def seg_predict(self, model, batch, sample_y):
-        batch['y_pred'] = {'data': model(batch['X']['data'])}
+    def seg_predict(self, model, batch, subjects, sample_y):
+        batch['y_pred'] = model(batch['X'])
 
-        for i in range(len(batch['subjects'])):
-            subject = batch['subjects'][i]
+        for i in range(len(subjects)):
+            subject = subjects[i]
             y_pred = copy.deepcopy(sample_y)
-            y_pred.set_data(batch['y_pred']['data'][i].detach().cpu())
+            y_pred.set_data(batch['y_pred'][i].detach().cpu())
             subject['y_pred'] = y_pred
+            self.add_evaluation_labels(subject)
 
-            transform = subject.get_composed_history()
-            label_transform_types = [LabelTransform, CopyProperty, RenameProperty, ConcatenateImages]
-            label_transform = filter_transform(transform, include_types=label_transform_types)
-            inverse_label_transform = label_transform.inverse(warn=False)
+    def add_evaluation_labels(self, subject):
+        transform = subject.get_composed_history()
+        label_transform_types = [LabelTransform, CopyProperty, RenameProperty, ConcatenateImages]
+        label_transform = filter_transform(transform, include_types=label_transform_types)
+        inverse_label_transform = label_transform.inverse(warn=False)
 
-            evaluation_transform = tio.Compose([
-                inverse_label_transform,
-                CustomSequentialLabels(),
-                filter_transform(inverse_label_transform, exclude_types=[CustomRemapLabels]).inverse(warn=False)
-            ])
+        evaluation_transform = tio.Compose([
+            inverse_label_transform,
+            CustomSequentialLabels(),
+            filter_transform(inverse_label_transform, exclude_types=[CustomRemapLabels]).inverse(warn=False)
+        ])
 
-            pred_subject = tio.Subject({'y': y_pred})
+        if 'y_pred' in subject:
+            pred_subject = tio.Subject({'y': subject['y_pred']})
             subject['y_pred_eval'] = evaluation_transform(pred_subject)['y']
 
-            if 'y' in subject:
-                target_subject = tio.Subject({'y': subject['y']})
-                subject['y_eval'] = evaluation_transform(target_subject)['y']
+        if 'y' in subject:
+            target_subject = tio.Subject({'y': subject['y']})
+            subject['y_eval'] = evaluation_transform(target_subject)['y']

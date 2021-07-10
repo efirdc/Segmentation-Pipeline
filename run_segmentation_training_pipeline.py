@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 import torch
 
+from loggers import *
 from torch_context import TorchContext
 from utils import load_module
 
@@ -29,10 +30,9 @@ if __name__ == "__main__":
     parser.add_argument("dataset_path", type=str,
                         help="Path to the dataset. If the dataset is a .tar file it will be unzipped first."
                         )
-    parser.add_argument("checkpoints_path", type=str, help="Path to directory for saving checkpoints.")
     parser.add_argument("config", type=str, default="",
                         help="Path to a python file which sets up the configuration. This file must define a function"
-                             "get_context() which returns a Context object. See the ./configs/ folder for examples."
+                             "get_context() which returns a TorchContext. See the ./configs/ folder for examples."
                         )
     parser.add_argument("--work_path", type=str, default=None,
                         help="Copy the dataset to this directory before training begins."
@@ -52,14 +52,21 @@ if __name__ == "__main__":
                         help="Length of time to train for. Format: days-hours:minutes:seconds "
                              "Training may stop early if the number of iterations run out first."
                         )
-    parser.add_argument("--wandb_project", type=str, default="segmentation",
-                        help="Project name for Weights and Biases logging service."
+    parser.add_argument("--logger", type=str, default=None,
+                        help="Logging implementation to use. Set to 'wandb' to enable Weights and Bias logging service."
                         )
+    parser.add_argument("--project_name", type=str, default="segmentation",
+                        help="Project name for logger."
+                        )
+    parser.add_argument("--logging_dir", type=str, help="Path to directory for saving checkpoints.")
     parser.add_argument("--preload_training_data", type=bool, default=False,
                         help="Optionally preload the entire training dataset into memory."
                         )
     parser.add_argument("--preload_validation_data", type=bool, default=False,
                         help="Optionally preload the entire validation dataset into memory."
+                        )
+    parser.add_argument("--num_workers", type=int, default=0,
+                        help="How many CPU threads to use for data loading, preprocessing, and augmentation."
                         )
     parser.add_argument("--validation_batch_size", type=int, default=4,
                         help="How many validation subjects should be run through the model at once."
@@ -119,7 +126,7 @@ if __name__ == "__main__":
     print(f"Using device {device}")
 
     # Initialize a new context, or load from a file to resume training
-    variables = dict(DATASET_PATH=str(dataset_path), CHECKPOINTS_PATH=args.checkpoints_path)
+    variables = dict(DATASET_PATH=str(dataset_path))
     if args.load_checkpoint is None:
         config = load_module(args.config)
         context = config.get_context(device, variables, **extra_args)
@@ -127,8 +134,18 @@ if __name__ == "__main__":
         context = TorchContext(device, file_path=args.load_checkpoint, variables=variables)
     context.init_components()
 
+    if args.logger == 'wandb':
+        logger = WandbLogger(args.project_name, args.logging_dir)
+    else:
+        logger = NonLogger()
+
     print("entering training loop")
-    context.trainer.train(context, args.iterations, stop_time=stop_time, wandb_project=args.wandb_project,
+    context.trainer.train(context,
+                          args.iterations,
+                          stop_time=stop_time,
                           preload_training_data=args.preload_training_data,
                           preload_validation_data=args.preload_validation_data,
-                          validation_batch_size=args.validation_batch_size)
+                          num_workers=args.num_workers,
+                          validation_batch_size=args.validation_batch_size,
+                          validation_patch_batch_size=args.validation_batch_size,
+                          logger=logger)
