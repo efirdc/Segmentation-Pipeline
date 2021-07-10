@@ -24,7 +24,7 @@ class SubjectFilter:
     ):
         subjects = vargs_or_sequence(subjects)
         if is_sequence(subjects) and all(isinstance(subject, tio.Subject) for subject in subjects):
-            return list(filter(self.subject_filter, subjects))
+            return self.apply_filter(subjects)
         else:
             raise ValueError("A SubjectFilter can only be applied to a sequence of tio.Subject, "
                              f"not {subjects}")
