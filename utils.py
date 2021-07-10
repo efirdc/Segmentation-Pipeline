@@ -121,17 +121,17 @@ def filter_transform(
     return transform
 
 
-def to_wandb(elem):
-    if isinstance(elem, dict):
-        return {
-            key: to_wandb(val)
-            for key, val in elem.items()
-        }
-    elif isinstance(elem, pd.DataFrame):
-        return wandb.Table(dataframe=elem)
-    elif isinstance(elem, Image.Image):
-        return wandb.Image(elem)
-    return elem
+def collate_subjects(
+        subjects: Sequence[tio.Subject],
+        image_names: Sequence[str],
+        device: torch.device
+        ):
+    batch = {}
+    for image_name in image_names:
+        data = torch.stack([subject[image_name]['data'] for subject in subjects])
+        data = data.to(device)
+        batch[image_name] = data
+    return batch
 
 
 def save_dataset_as_nn_unet(dataset, output_path, short_name, image_names, label_map_name,
