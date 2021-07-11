@@ -21,11 +21,12 @@ class HybridLogisticDiceLoss(nn.Module):
         N, C, W, H, D = prediction.shape
         spatial_dims = (2, 3, 4)
 
+        eps = 1e-8
+
         overlap = torch.sum(prediction * target, dim=spatial_dims)
         total = torch.sum(target * target, dim=spatial_dims) + torch.sum(prediction * prediction, dim=spatial_dims)
-        dice_coeffs = 2 * overlap / total
+        dice_coeffs = 2 * overlap / (total + eps)
 
-        eps = 1e-8
         logistic = torch.mean(target * (torch.log(prediction + eps) - eps), dim=spatial_dims)
         if self.logistic_weights is not None:
             logistic_weights = torch.tensor(self.logistic_weights)[None]

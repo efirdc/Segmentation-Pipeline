@@ -1,3 +1,5 @@
+import copy
+
 import torchio as tio
 import torch
 from typing import Sequence
@@ -28,10 +30,8 @@ class ConcatenateImages(tio.Transform):
         images = [subject[image_name] for image_name in self.image_names]
         new_image_data = torch.cat([image.data for image in images])
 
-        if isinstance(new_image_data, torch.IntTensor):
-            new_image = tio.LabelMap(tensor=new_image_data)
-        else:
-            new_image = tio.ScalarImage(tensor=new_image_data)
+        new_image = copy.deepcopy(subject[self.image_names[0]])
+        new_image.set_data(new_image_data)
 
         subject[self.new_image_name] = new_image
 

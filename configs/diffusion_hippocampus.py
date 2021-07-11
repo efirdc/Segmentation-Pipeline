@@ -2,7 +2,7 @@ import os
 
 from torch_context import TorchContext
 import torchio as tio
-from segmentation_training import SegmentationTrainer, ScheduledEvaluation
+from segmentation_trainer import SegmentationTrainer, ScheduledEvaluation
 from models import NestedResUNet
 from evaluation import HybridLogisticDiceLoss
 from torch.optim import Adam
@@ -138,13 +138,17 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
         ab300_dice = mean(ab300_dice.values())
 
         # Model must perform equally well on cbbrain and ab300
-        score = cbbrain_dice + ab300_dice
+        score = (cbbrain_dice + ab300_dice) / 2
         return score
 
-    context.add_component("trainer", SegmentationTrainer, training_batch_size=2,
-                          save_folder="$CHECKPOINTS_PATH", save_rate=100, scoring_interval=50,
-                          scoring_function=scoring_function, one_time_evaluators=one_time_evaluators,
-                          training_evaluators=training_evaluators, validation_evaluators=validation_evaluators,
+    context.add_component("trainer", SegmentationTrainer,
+                          training_batch_size=2,
+                          save_rate=100,
+                          scoring_interval=50,
+                          scoring_function=scoring_function,
+                          one_time_evaluators=one_time_evaluators,
+                          training_evaluators=training_evaluators,
+                          validation_evaluators=validation_evaluators,
                           max_iterations_with_no_improvement=500)
 
     return context

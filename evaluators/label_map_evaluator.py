@@ -47,49 +47,69 @@ class LabelMapEvaluator(Evaluator):
         self.stats_to_output = stats_to_output
         self.summary_stats_to_output = summary_stats_to_output
 
+        if self.stats_to_output is None:
+            self.stats_to_output = ('volume',)
+        if self.summary_stats_to_output is None:
+            self.summary_stats_to_output = ('mean', 'median', 'mode', 'std', 'min', 'max')
+
     def __call__(self, subjects):
-        # TODO: Lots of repeated code from segmentation_evaluator.py, generalize this
         label_values = subjects[0][self.label_map_name]['label_values']
         label_names = list(label_values.keys())
         subject_names = [subject['name'] for subject in subjects]
 
-        label = torch.stack([
-            subject[self.label_map_name].data for subject in subjects
-        ])
+        subject_stats = {
+            subject_name: {
+                label_name: None
+                for label_name in label_names
+            }
+            for subject_name in subject_names
+        }
 
-        spatial_dims = (-1, -2, -3)
-        volume = label.sum(dim=spatial_dims)
-        stats = {'volume': volume}
+        for subject in subjects:
+            label_data = subject[self.label_map_name].data.bool()
 
-        out_dict = {}
-        summary_stat_funcs = self.get_summary_stat_funcs()
+            spatial_dims = (1, 2, 3)
+            stats = {
+                'volume': label_data.sum(dim=spatial_dims),
+            }
 
-        stats_to_output = self.stats_to_output
-        if stats_to_output is None:
-            stats_to_output = list(stats.keys())
-        summary_stats_to_output = self.summary_stats_to_output
-        if summary_stats_to_output is None:
-            summary_stats_to_output = list(summary_stat_funcs.keys())
+            for label_name, label_value in label_values.items():
+                subject_stats[subject['name']][label_name] = {
+                    stat_name: stat_value[label_value]
+                    for stat_name, stat_value in stats.items()
+                }
 
-        out_dict['summary_stats'] = {
+        # Recall that the desired form is
+        # {summary_stat_name: {stat_name: {label_name: value}}}
+        summary_stats = {
             summary_stat_name: {
                 stat_name: {
-                    label_name: func(stat[:, label_value].float()).tolist()
-                    for label_name, label_value in label_values.items()
+                    label_name: None for label_name in label_names
                 }
-                for stat_name, stat in stats.items()
-                if stat_name in stats_to_output
+                for stat_name in self.stats_to_output
             }
-            for summary_stat_name, func in summary_stat_funcs.items()
-            if summary_stat_name in summary_stats_to_output
+            for summary_stat_name in self.summary_stats_to_output
         }
 
         df = pd.DataFrame()
         df['subject'] = subject_names
 
-        for i, label_name in enumerate(label_values.keys()):
-            for stat_name in stats_to_output:
-                df[f'{stat_name}.{label_name}'] = stats[stat_name][:, i]
-        out_dict['subject_stats'] = df
+        summary_stat_funcs = self.get_summary_stat_funcs()
+
+        for summary_stat_name in self.summary_stats_to_output:
+            for stat_name in self.stats_to_output:
+                for label_name in label_names:
+                    subject_values = torch.tensor([
+                        subject_stats[subject_name][label_name][stat_name]
+                        for subject_name in subject_names
+                    ]).float()
+
+                    summary_stat_func = summary_stat_funcs[summary_stat_name]
+                    summary_stat = summary_stat_func(subject_values).float()
+                    summary_stats[summary_stat_name][stat_name][label_name] = summary_stat
+
+                    df[f'{stat_name}.{label_name}'] = subject_values
+
+        out_dict = {'subject_stats': df, 'summary_stats': summary_stats}
 
         return out_dict

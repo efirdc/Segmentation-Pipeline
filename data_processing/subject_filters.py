@@ -1,17 +1,21 @@
-from abc import ABC, abstractmethod
+from random import Random
 from typing import Sequence, Dict, Union, Any
 
+import numpy as np
 import torchio as tio
 
-from utils import as_set, is_sequence, vargs_or_sequence
+from utils import as_set, is_sequence, vargs_or_sequence, as_list
 
 
-class SubjectFilter(ABC):
-    """ Abstract class for filtering subjects
+class SubjectFilter:
+    """ Base class for filtering subjects
 
-    All subclasses must overwrite the `subject_filter` method,
-    which takes a `tio.Subject` a bool that is `True` if the subject
-    will be kept and `False` if the subject will be filtered.
+    Implementations which depend only the attributes of a single subject
+    can overwrite the `subject_filter` method which takes a `tio.Subject`
+    and returns a bool that is `True` if the subject will be kept and `False`
+    if the subject will be filtered.
+
+    For cases like generating train/test splits, overwrite the `apply_filter` method.
 
     """
     def __call__(
@@ -20,12 +24,14 @@ class SubjectFilter(ABC):
     ):
         subjects = vargs_or_sequence(subjects)
         if is_sequence(subjects) and all(isinstance(subject, tio.Subject) for subject in subjects):
-            return list(filter(self.subject_filter, subjects))
+            return self.apply_filter(subjects)
         else:
             raise ValueError("A SubjectFilter can only be applied to a sequence of tio.Subject, "
                              f"not {subjects}")
 
-    @abstractmethod
+    def apply_filter(self, subjects: Sequence[tio.Subject]):
+        return list(filter(self.subject_filter, subjects))
+
     def subject_filter(self, subject: tio.Subject) -> bool:
         raise NotImplementedError()
 
@@ -123,8 +129,16 @@ class ComposeFilters(SubjectFilter):
     def __init__(self, *filters: Union[SubjectFilter, Sequence[SubjectFilter]]):
         self.filters = vargs_or_sequence(filters)
 
-    def subject_filter(self, subject):
-        return all(f.subject_filter(subject) for f in self.filters)
+    def apply_filter(self, subjects):
+        groups = [
+            subject_filter(subjects)
+            for subject_filter in self.filters
+        ]
+        subjects = [
+            subject for subject in subjects
+            if all(subject in group for group in groups)
+        ]
+        return subjects
 
 
 class AnyFilter(SubjectFilter):
@@ -136,8 +150,18 @@ class AnyFilter(SubjectFilter):
     def __init__(self, *filters: Union[SubjectFilter, Sequence[SubjectFilter]]):
         self.filters = vargs_or_sequence(filters)
 
-    def subject_filter(self, subject):
-        return any(f.subject_filter(subject) for f in self.filters)
+    def apply_filter(self, subjects):
+        if len(self.filters) == 0:
+            return subjects
+        groups = [
+            subject_filter(subjects)
+            for subject_filter in self.filters
+        ]
+        subjects = [
+            subject for subject in subjects
+            if any(subject in group for group in groups)
+        ]
+        return subjects
 
 
 class NegateFilter(SubjectFilter):
@@ -149,5 +173,47 @@ class NegateFilter(SubjectFilter):
     def __init__(self, filter: SubjectFilter):
         self.filter = filter
 
-    def subject_filter(self, subject):
-        return not self.filter.subject_filter(subject)
+    def apply_filter(self, subjects):
+        remove_subjects = self.filter(subjects)
+        subjects = [
+            subject for subject in subjects
+            if subject not in remove_subjects
+        ]
+        return subjects
+
+
+class RandomFoldFilter(SubjectFilter):
+    """Splits subjects into folds in a deterministic random way.
+
+    Args:
+        num_folds: Subjects are split into this many evenly sized folds.
+        selection: Subjects not in these folds are filtered (0 indexed)
+        seed: Seed for generating random folds.
+    """
+    def __init__(
+            self,
+            num_folds: int,
+            selection: Union[int, Sequence[int]],
+            seed: int = 0,
+    ):
+        self.num_folds = num_folds
+        self.selection = as_list(selection)
+        self.seed = seed
+
+        assert all(0 <= sel < self.num_folds for sel in self.selection)
+
+    def apply_filter(self, subjects):
+
+        fold_ids = [i % self.num_folds for i in range(len(subjects))]
+        Random(self.seed).shuffle(fold_ids)
+
+        subjects = [
+            subject for subject, fold_id in zip(subjects, fold_ids)
+            if fold_id in self.selection
+        ]
+
+        return subjects
+
+
+
+

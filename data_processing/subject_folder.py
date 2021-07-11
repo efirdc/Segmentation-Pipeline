@@ -1,15 +1,13 @@
 import os
 
 import copy
-from typing import Sequence, Dict, Union
+from typing import Dict, Union
 
 from torch.utils.data import Dataset
-from torch.utils.data.dataloader import default_collate
 import torchio as tio
 
 from .subject_loaders import SubjectLoader
-from .subject_filters import SubjectFilter
-from utils import as_list
+from .subject_filters import SubjectFilter, ComposeFilters
 
 
 class SubjectFolder(Dataset):
@@ -33,7 +31,6 @@ class SubjectFolder(Dataset):
             If a matching key is in `cohorts`, then that transformation will become
             active when ``set_cohort(cohort_name)`` is called.
             A transformation can also be explicitly set with ``set_transform(transform_name)``.
-        collate_attributes: Subject attributes that will be grouped into tensors by a dataloader.
     """
     def __init__(
             self,
@@ -42,14 +39,12 @@ class SubjectFolder(Dataset):
             subject_loader: SubjectLoader,
             cohorts: Dict[str, SubjectFilter] = None,
             transforms: Union[tio.Transform, Dict[str, tio.Transform]] = None,
-            collate_attributes: Sequence[str] = None
     ):
         self.root = root
         self.subject_path = os.path.join(self.root, subject_path)
         self.subject_loader = subject_loader
         self.cohorts = cohorts
         self.transforms = transforms
-        self.collate_attributes = as_list(collate_attributes)
 
         self._preloaded = False
         self._pretransformed = False
@@ -139,12 +134,11 @@ class SubjectFolder(Dataset):
 
         cohorts = self.cohorts.copy()
         if 'all' in cohorts:
-            cohorts['all'] = cohorts['all'] and subject_filter
+            cohorts['all'] = ComposeFilters(cohorts['all'], subject_filter)
         else:
             cohorts['all'] = subject_filter
 
-        return SubjectFolder(self.root, self.subject_path, self.subject_loader, cohorts,
-                             transforms, self.collate_attributes)
+        return SubjectFolder(self.root, self.subject_path, self.subject_loader, cohorts, transforms)
 
     def __len__(self):
         return len(self.subjects)
@@ -176,14 +170,6 @@ class SubjectFolder(Dataset):
         if isinstance(item, tio.Subject):
             return item in self.subjects
         return False
-
-    def collate(self, batch: Sequence[tio.Subject]):
-        out_dict = default_collate([
-            {attrib: subject[attrib] for attrib in self.collate_attributes}
-            for subject in batch
-        ])
-        out_dict['subjects'] = batch
-        return out_dict
 
     # Preloads the images for all subjects. Typically they are lazy-loaded in __getitem__.
     def preload_subjects(self):

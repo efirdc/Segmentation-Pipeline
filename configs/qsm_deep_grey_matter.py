@@ -1,7 +1,7 @@
 from torch_context import TorchContext
 import torchio as tio
 from data_processing.subject_folder import SubjectFolder
-from segmentation_training import SegmentationTrainer
+from segmentation_trainer import SegmentationTrainer
 from models import NestedResUNet
 from evaluation import HybridLogisticDiceLoss
 from torch.utils.data import DataLoader, RandomSampler
