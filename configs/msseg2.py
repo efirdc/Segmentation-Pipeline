@@ -35,7 +35,7 @@ def get_context(device, variables, fold=0, **kwargs):
     ])
 
     cohorts = {}
-    cohorts['all'] = RequireAttributes(input_images + output_labels)
+    cohorts['all'] = RequireAttributes(input_images)
     cohorts['validation'] = RandomFoldFilter(num_folds=5, selection=fold, seed=0xDEADBEEF)
     cohorts['training'] = NegateFilter(cohorts['validation'])
 

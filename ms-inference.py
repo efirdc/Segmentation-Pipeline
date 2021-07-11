@@ -1,12 +1,9 @@
 import argparse
 from pathlib import Path
 import shutil
-from subprocess import call
+import subprocess
 
-import torchio as tio
-import torch
-
-CONTEXT_PATH = "saved_models/iter00000000.pt"
+CONTEXT_PATH = Path("/Segmentation-Pipeline/saved_models/ms-seg.pt")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Detect new MS lesions from two FLAIR images.")
@@ -23,33 +20,42 @@ if __name__ == "__main__":
     output = Path(args.output)
     data_folder = Path(args.data_folder)
 
-    input_folder = data_folder / "input" / "raw_data" / "01"
-    input_folder.mkdir(exist_ok=True, parents=True)
+    input_folder = data_folder / "input" / "raw_data"
 
-    input_file01 = input_folder / flair_time01.name
+    subject_folder = input_folder / "01"
+    subject_folder.mkdir(exist_ok=True, parents=True)
+
+    input_file01 = subject_folder / "flair_time01_on_middle_space.nii.gz"
     shutil.copy(flair_time01, input_file01)
 
-    input_file02 = input_folder / flair_time02.name
+    input_file02 = subject_folder / "flair_time02_on_middle_space.nii.gz"
     shutil.copy(flair_time02, input_file02)
 
     output_folder = data_folder / "output"
     output_folder.mkdir(exist_ok=True)
 
-    precessed_folder = data_folder / "input" / "processed"
-    precessed_folder.mkdir(exist_ok=True, parents=True)
+    processed_folder = data_folder / "input" / "processed"
+    processed_folder.mkdir(exist_ok=True, parents=True)
 
-    # call(
-    #     [
-    #         "python", "Anima-Scripts-Public/ms_lesion_segmentation/animaMSLongitudinalPreprocessing.py",
-    #         "-i", input_folder,
-    #         "-o", precessed_folder,
-    #     ], shell=True
-    # )
+    p1 = subprocess.run(
+        [
+            "python", "/Segmentation-Pipeline/Anima-Scripts-Public/ms_lesion_segmentation/animaMSLongitudinalPreprocessing.py",
+            "-i", input_folder,
+            "-o", processed_folder,
+        ]
+    )
 
-    # call(["python", "inference.py", CONTEXT_PATH, precessed_folder, "test_pred.nii", "--out_folder", output_folder])
+    p2 = subprocess.run(
+        [
+            "python", "/Segmentation-Pipeline/inference.py",
+            CONTEXT_PATH,
+            processed_folder,
+            "temp.nii",
+            "--out_folder", output_folder,
+            "--keep_isolated_components"
+        ]
+    )
 
-    img = tio.ScalarImage(input_file01)
-    random_tensor = torch.rand(img.shape)
+    outputFile = output_folder / "01" / "temp.nii"
 
-    label_map = tio.LabelMap(tensor=(random_tensor > 0.95))
-    label_map.save(output)
+    shutil.copy(outputFile, output)
