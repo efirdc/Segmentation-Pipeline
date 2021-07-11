@@ -62,7 +62,7 @@ class WandbLogger(Logger):
         wandb.init(**wandb_params)
 
         # Save code on first iteration
-        if resuming_previous_run:
+        if not resuming_previous_run:
             for file_path in context.file_paths:
                 wandb.save(file_path)
 
