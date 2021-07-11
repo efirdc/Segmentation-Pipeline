@@ -10,6 +10,7 @@ from tqdm import tqdm
 from data_processing import *
 from post_processing import *
 from torch_context import TorchContext
+from utils import collate_subjects, dont_collate
 
 
 def segmentation_predict(context, input_data):
@@ -92,23 +93,27 @@ if __name__ == "__main__":
 
     context.init_components()
     dataset = context.dataset
-    dataset.collate_attributes += ["X"]
 
     test_dataloader = DataLoader(
-        dataset=dataset, batch_size=1, sampler=SequentialSampler(dataset), collate_fn=dataset.collate
+        dataset=dataset, batch_size=1, sampler=SequentialSampler(dataset), collate_fn=dont_collate
     )
 
     total = len(context.dataset)
     pbar = tqdm(total=total)
     context.model.eval()
-    for i, batch in enumerate(test_dataloader):
+    for i, subjects in enumerate(test_dataloader):
 
-        assert len(batch["subjects"]) == 1, "Batch size must be 1"
+        assert len(subjects) == 1, "Batch size must be 1"
 
-        subject = batch["subjects"][0]
+        subject = subjects[0]
         pbar.write(f"subject {subject['name']}: ")
         out_folder = prepare_output_folder(subject, args.out_folder)
-        probs = segmentation_predict(context, batch["X"]["data"])
+
+        if context.trainer.enable_patch_mode:
+            probs = context.trainer.patch_predict(context, subject, 32)
+        else:
+            batch = collate_subjects(subjects, image_names=["X"], device=context.device)
+            probs = segmentation_predict(context, batch["X"])
 
         if not args.output_probabilities:
 
@@ -117,11 +122,13 @@ if __name__ == "__main__":
 
             if args.remove_isolated_components:
                 num_components = out.max()
-                out, components_removed, component_voxels_removed = keep_components(out, num_components, return_counts=True)
+                out, components_removed, component_voxels_removed = keep_components(
+                    out, num_components, return_counts=True
+                )
                 pbar.write(
-                        f"\tRemoved {component_voxels_removed} voxels from "
-                        f"{components_removed} detected isolated components."
-                    )
+                    f"\tRemoved {component_voxels_removed} voxels from "
+                    f"{components_removed} detected isolated components."
+                )
 
             if args.remove_holes:
                 out, hole_voxels_removed = remove_holes(out, hole_size=64, return_counts=True)
@@ -133,7 +140,6 @@ if __name__ == "__main__":
 
         else:
             image = tio.ScalarImage(tensor=probs)
-
 
         inverse_transforms = subject.get_composed_history().inverse(warn=False)
         image = inverse_transforms(image)
@@ -147,7 +153,7 @@ if __name__ == "__main__":
 
         assert orig_subject.shape[1:] == image.shape[1:], "Segmentation shape and original image shape do not match"
 
-        pbar.write("\tSaving image...") 
+        pbar.write("\tSaving image...")
         image.save(out_folder / args.output_filename)
         pbar.write("\tFinished subject")
         pbar.update(1)
