@@ -207,15 +207,17 @@ class SegmentationTrainer:
             if len(validation_evaluators) > 0:
 
                 # Run every subject that is scheduled to be evaluated through the model
-                validation_filter = self.get_filter_from_scheduled_evaluations(context.dataset, validation_evaluators)
-                validation_dataset = context.dataset.get_cohort_dataset(validation_filter)
+                validation_filter = self.get_filter_from_scheduled_evaluations(context.dataset,
+                                                                               validation_evaluators,
+                                                                               include_fold_filters=False)
+                validation_dataset.set_cohort(validation_filter)
                 validation_dataloader = DataLoader(dataset=validation_dataset,
                                                    batch_size=validation_batch_size,
                                                    sampler=SequentialSampler(validation_dataset),
                                                    collate_fn=dont_collate,
                                                    num_workers=num_workers)
-                validation_subjects = []
 
+                validation_subjects = []
                 for subjects in validation_dataloader:
                     if not self.enable_patch_mode:
                         batch = collate_subjects(subjects, image_names=['X'], device=context.device)
@@ -309,13 +311,20 @@ class SegmentationTrainer:
     def get_filter_from_scheduled_evaluations(
             self,
             dataset: SubjectFolder,
-            scheduled_evaluations: Sequence[ScheduledEvaluation]
+            scheduled_evaluations: Sequence[ScheduledEvaluation],
+            include_fold_filters: bool = True,
     ):
         filters = []
         for scheduled_evaluation in scheduled_evaluations:
             if scheduled_evaluation.cohorts is not None:
                 cohort_names = scheduled_evaluation.cohorts
-                filters += [dataset.cohorts[cohort_name] for cohort_name in cohort_names]
+
+                # TODO: Rethink things so this removal of RandomFoldFilter isnt needed.
+                filters += [
+                    dataset.cohorts[cohort_name] for cohort_name in cohort_names
+                    if include_fold_filters or not isinstance(dataset.cohorts[cohort_name], RandomFoldFilter)
+                ]
+
             elif scheduled_evaluation.subjects is not None:
                 subject_names = scheduled_evaluation.subjects
                 filters.append(RequireAttributes({'name': subject_names}))
