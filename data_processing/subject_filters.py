@@ -151,6 +151,8 @@ class AnyFilter(SubjectFilter):
         self.filters = vargs_or_sequence(filters)
 
     def apply_filter(self, subjects):
+        if len(self.filters) == 0:
+            return subjects
         groups = [
             subject_filter(subjects)
             for subject_filter in self.filters

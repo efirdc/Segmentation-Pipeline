@@ -1,15 +1,13 @@
 import os
 
 import copy
-from typing import Sequence, Dict, Union
+from typing import Dict, Union
 
 from torch.utils.data import Dataset
-from torch.utils.data.dataloader import default_collate
 import torchio as tio
 
 from .subject_loaders import SubjectLoader
-from .subject_filters import SubjectFilter
-from utils import as_list
+from .subject_filters import SubjectFilter, ComposeFilters
 
 
 class SubjectFolder(Dataset):
@@ -136,7 +134,7 @@ class SubjectFolder(Dataset):
 
         cohorts = self.cohorts.copy()
         if 'all' in cohorts:
-            cohorts['all'] = cohorts['all'] and subject_filter
+            cohorts['all'] = ComposeFilters(cohorts['all'], subject_filter)
         else:
             cohorts['all'] = subject_filter
 
