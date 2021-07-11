@@ -41,12 +41,7 @@ class ContourImageEvaluator(Evaluator):
         self.interesting_slice = interesting_slice
         self.split_subjects = split_subjects
 
-    def get_slice_id(self, subject):
-
-        if self.plane.lower() == 'random':
-            plane = ("Axial", "Coronal", "Saggital")[random.randint(0, 2)]
-        else:
-            plane = self.plane
+    def get_slice_id(self, subject, plane):
 
         if not self.interesting_slice:
             return self.slice_id, plane
@@ -80,10 +75,10 @@ class ContourImageEvaluator(Evaluator):
             return slice_property[plane][-1]
         return slice_property[plane][slice_id]
 
-    def slice_and_make_grid(self, subjects, image_name, channel, impute_shape, pad_value=0):
+    def slice_and_make_grid(self, subjects, plane, image_name, channel, impute_shape, pad_value=0):
         slices = []
         for subject in subjects:
-            slice_id, plane = self.get_slice_id(subject)
+            slice_id, plane = self.get_slice_id(subject, plane)
             if image_name in subject:
                 slices.append(slice_volume(subject[image_name].data, channel, plane, slice_id).unsqueeze(0))
             else:
@@ -109,20 +104,27 @@ class ContourImageEvaluator(Evaluator):
         if out_target:
             label_values = subjects[0][self.target_label_map_name]['label_values']
 
+        if self.plane.lower() == 'random':
+            plane = ("Axial", "Coronal", "Saggital")[random.randint(0, 2)]
+        else:
+            plane = self.plane
+
         sample_subject = subjects[0]
-        slice_id, plane = self.get_slice_id(sample_subject)
+        slice_id, plane = self.get_slice_id(sample_subject, plane)
         sample_slice = slice_volume(sample_subject[self.image_name].data, 0, plane, 0)
         impute_shape = sample_slice.shape
 
-        img = self.slice_and_make_grid(subjects, self.image_name, 0, impute_shape, pad_value=-1)
+        img = self.slice_and_make_grid(subjects, plane, self.image_name, 0, impute_shape, pad_value=-1)
         if out_target:
             y = {
-                label_name: self.slice_and_make_grid(subjects, self.target_label_map_name, label_value, impute_shape).bool()
+                label_name: self.slice_and_make_grid(
+                    subjects, plane, self.target_label_map_name, label_value, impute_shape).bool()
                 for label_name, label_value in label_values.items()
             }
         if out_pred:
             y_pred = {
-                label_name: self.slice_and_make_grid(subjects, self.prediction_label_map_name, label_value, impute_shape).bool()
+                label_name: self.slice_and_make_grid(
+                    subjects, plane, self.prediction_label_map_name, label_value, impute_shape).bool()
                 for label_name, label_value in label_values.items()
             }
 
