@@ -77,9 +77,9 @@ def get_context(device, variables, fold=0, **kwargs):
     context.add_component("dataset", SubjectFolder, root='$DATASET_PATH', subject_path="",
                           subject_loader=subject_loader, cohorts=cohorts, transforms=transforms)
     context.add_component("model", NestedResUNet, input_channels=2, output_channels=2,
-                          filters=20, dropout_p=0.2, saggital_split=False)
+                          filters=40, dropout_p=0.2, saggital_split=False)
     context.add_component("optimizer", SGD, params="self.model.parameters()", lr=0.01, momentum=0.95)
-    context.add_component("criterion", HybridLogisticDiceLoss)
+    context.add_component("criterion", HybridLogisticDiceLoss, logistic_class_weights=[1, 2500])
 
     training_evaluators = [
         ScheduledEvaluation(evaluator=SegmentationEvaluator('y_pred_eval', 'y_eval'),

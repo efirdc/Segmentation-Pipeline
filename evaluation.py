@@ -12,39 +12,43 @@ def saturate_probabilities(x):
 
 
 class HybridLogisticDiceLoss(nn.Module):
-    def __init__(self, dice_weight=0.5, logistic_weights=None):
+    def __init__(self, dice_weight=0.5, logistic_class_weights=None, square_dice=True):
         super().__init__()
         self.dice_weight = dice_weight
-        self.logistic_weights = logistic_weights
+        self.logistic_class_weights = logistic_class_weights
+        self.square_dice = square_dice
 
     def forward(self, prediction, target):
-        N, C, W, H, D = prediction.shape
         spatial_dims = (2, 3, 4)
-
         eps = 1e-8
 
         overlap = torch.sum(prediction * target, dim=spatial_dims)
-        total = torch.sum(target * target, dim=spatial_dims) + torch.sum(prediction * prediction, dim=spatial_dims)
+        if self.square_dice:
+            total = torch.sum(target * target, dim=spatial_dims) + torch.sum(prediction * prediction, dim=spatial_dims)
+        else:
+            total = torch.sum(target, dim=spatial_dims) + torch.sum(prediction, dim=spatial_dims)
         dice_coeffs = 2 * overlap / (total + eps)
 
-        logistic = torch.mean(target * (torch.log(prediction + eps) - eps), dim=spatial_dims)
-        if self.logistic_weights is not None:
-            logistic_weights = torch.tensor(self.logistic_weights)[None]
-            logistic_weights = logistic_weights.to(logistic.device)
-            logistic = logistic * logistic_weights
+        # Shift prediction from [0, 1] range to [eps, 1] range
+        prediction_safe = (prediction + eps) / (1 + eps)
 
-        logistic_loss = -logistic
-        dice_loss = 1 - dice_coeffs
+        logistic = torch.mean(target * torch.log(prediction_safe), dim=spatial_dims)
+        if self.logistic_class_weights is not None:
+            weights = torch.tensor(self.logistic_class_weights)[None]
+            weights = weights.to(logistic.device)
+            weights = weights / torch.sum(weights)
+            logistic = logistic * weights
 
-        logistic_loss = logistic_loss * (1. - self.dice_weight)
-        dice_loss = dice_loss * self.dice_weight
+        logistic_loss = torch.mean(-logistic)
+        dice_loss = torch.mean(1 - dice_coeffs)
 
-        hybrid = logistic_loss + dice_loss
+        t = self.dice_weight
+        hybrid_loss = (1. - t) * logistic_loss + t * dice_loss
 
         return {
-            'loss': torch.mean(hybrid),
-            "dice_loss": torch.mean(dice_loss),
-            "logistic_loss": torch.mean(logistic_loss)
+            'loss': hybrid_loss,
+            "dice_loss": dice_loss,
+            "logistic_loss": logistic_loss,
         }
 
 
