@@ -22,7 +22,6 @@ def get_context(device, variables, fold=0, **kwargs):
     }
 
     input_images = ["flair_time01", "flair_time02"]
-    output_labels = ["ground_truth"]
 
     subject_loader = ComposeLoaders([
         ImageLoader(glob_pattern="flair_time01*", image_name='flair_time01', image_constructor=tio.ScalarImage),
@@ -74,7 +73,7 @@ def get_context(device, variables, fold=0, **kwargs):
     context.add_component("model", ModularUNet,
                           in_channels=2,
                           out_channels=2,
-                          filters=[32, 64, 128, 256, 512, 1024],
+                          filters=[32, 64, 128, 128, 128, 128],
                           depth=6,
                           block_params={'residual': True},
                           downsample_class=BlurConv3d,
@@ -93,7 +92,7 @@ def get_context(device, variables, fold=0, **kwargs):
                                                             slice_id=0, legend=True, ncol=2, interesting_slice=True,
                                                             split_subjects=False),
                             log_name=f"contour_image",
-                            interval=5),
+                            interval=15),
     ]
 
     validation_evaluators = [
