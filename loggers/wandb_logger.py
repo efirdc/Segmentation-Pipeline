@@ -48,6 +48,7 @@ class WandbLogger(Logger):
             wandb_params['id'] = context.metadata["wandb_id"] = wandb.util.generate_id()
             rw = RandomWords()
             context.name = f'{context.name}-{rw.random_word()}-{rw.random_word()}-{context.metadata["wandb_id"]}'
+            wandb_params['name'] = context.name
             wandb_params['config'] = context.get_config()
         else:
             wandb_params['id'] = context.metadata["wandb_id"]
