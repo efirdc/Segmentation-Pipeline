@@ -65,9 +65,9 @@ class SegmentationTrainer:
             patch_size: Union[int, Tuple[int, int, int]] = None,
             training_patch_sampler: PatchSampler = None,
             training_patches_per_volume: int = None,
-            inference_patch_overlap: Union[int, Tuple[int, int, int]] = None,
-            inference_padding_mode: Union[str, float, None] = None,
-            inference_overlap_mode: str = 'average',
+            validation_patch_overlap: Union[int, Tuple[int, int, int]] = None,
+            validation_padding_mode: Union[str, float, None] = None,
+            validation_overlap_mode: str = 'average',
     ):
         self.training_batch_size = training_batch_size
         self.save_rate = save_rate
@@ -81,9 +81,9 @@ class SegmentationTrainer:
         self.patch_size = patch_size
         self.training_patch_sampler = training_patch_sampler
         self.training_patches_per_volume = training_patches_per_volume
-        self.inference_patch_overlap = inference_patch_overlap
-        self.inference_padding_mode = inference_padding_mode
-        self.inference_overlap_mode = inference_overlap_mode
+        self.validation_patch_overlap = validation_patch_overlap
+        self.validation_padding_mode = validation_padding_mode
+        self.validation_overlap_mode = validation_overlap_mode
 
         self.iteration = 0
         self.max_score = -1
@@ -114,6 +114,7 @@ class SegmentationTrainer:
             logger=NonLogger(),
             **kwargs
     ):
+        print("Initializing logger.")
         logger.setup(context)
 
         # Get the training_dataset
@@ -136,7 +137,7 @@ class SegmentationTrainer:
         def dont_collate(subjects):
             return subjects
 
-        # Make dataloaders for training and validation datasets
+        # Make dataloader for training dataset
         if not self.enable_patch_mode:
             training_dataloader = DataLoader(dataset=training_dataset,
                                              batch_size=self.training_batch_size,
@@ -145,7 +146,7 @@ class SegmentationTrainer:
                                              num_workers=num_workers)
         else:
             queue = tio.Queue(training_dataset,
-                              max_length=20,
+                              max_length=100,
                               samples_per_volume=self.training_patches_per_volume,
                               sampler=self.training_patch_sampler,
                               num_workers=num_workers)
@@ -208,8 +209,7 @@ class SegmentationTrainer:
 
                 # Run every subject that is scheduled to be evaluated through the model
                 validation_filter = self.get_filter_from_scheduled_evaluations(context.dataset,
-                                                                               validation_evaluators,
-                                                                               include_fold_filters=False)
+                                                                               validation_evaluators)
                 validation_dataset.set_cohort(validation_filter)
                 validation_dataloader = DataLoader(dataset=validation_dataset,
                                                    batch_size=validation_batch_size,
@@ -228,12 +228,12 @@ class SegmentationTrainer:
                         for subject in subjects:
                             grid_sampler = tio.GridSampler(subject,
                                                            self.patch_size,
-                                                           self.inference_patch_overlap,
-                                                           self.inference_padding_mode)
+                                                           self.validation_patch_overlap,
+                                                           self.validation_padding_mode)
                             patch_loader = DataLoader(grid_sampler,
                                                       batch_size=validation_patch_batch_size,
                                                       collate_fn=dont_collate)
-                            aggregator = tio.GridAggregator(grid_sampler, overlap_mode=self.inference_overlap_mode)
+                            aggregator = tio.GridAggregator(grid_sampler, overlap_mode=self.validation_overlap_mode)
                             for subject_patches in patch_loader:
                                 locations = torch.stack([patch['location'] for patch in subject_patches])
                                 batch = collate_subjects(subject_patches, image_names=['X'], device=context.device)
@@ -312,17 +312,14 @@ class SegmentationTrainer:
             self,
             dataset: SubjectFolder,
             scheduled_evaluations: Sequence[ScheduledEvaluation],
-            include_fold_filters: bool = True,
     ):
         filters = []
         for scheduled_evaluation in scheduled_evaluations:
             if scheduled_evaluation.cohorts is not None:
                 cohort_names = scheduled_evaluation.cohorts
 
-                # TODO: Rethink things so this removal of RandomFoldFilter isnt needed.
                 filters += [
                     dataset.cohorts[cohort_name] for cohort_name in cohort_names
-                    if include_fold_filters or not isinstance(dataset.cohorts[cohort_name], RandomFoldFilter)
                 ]
 
             elif scheduled_evaluation.subjects is not None:
