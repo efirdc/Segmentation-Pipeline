@@ -15,7 +15,7 @@ from evaluators import *
 from data_processing import *
 from loggers import *
 from transforms import *
-from utils import Timer, filter_transform, collate_subjects
+from utils import Timer, filter_transform, collate_subjects, dont_collate
 
 
 EXIT = threading.Event()
@@ -134,8 +134,6 @@ class SegmentationTrainer:
             validation_dataset.preload_and_transform_subjects()
             print(f"Done. Took {round(time.time() - t, 2)}s")
 
-        def dont_collate(subjects):
-            return subjects
 
         # Make dataloader for training dataset
         if not self.enable_patch_mode:
@@ -226,22 +224,9 @@ class SegmentationTrainer:
                         validation_subjects += subjects
                     else:
                         for subject in subjects:
-                            grid_sampler = tio.GridSampler(subject,
-                                                           self.patch_size,
-                                                           self.validation_patch_overlap,
-                                                           self.validation_padding_mode)
-                            patch_loader = DataLoader(grid_sampler,
-                                                      batch_size=validation_patch_batch_size,
-                                                      collate_fn=dont_collate)
-                            aggregator = tio.GridAggregator(grid_sampler, overlap_mode=self.validation_overlap_mode)
-                            for subject_patches in patch_loader:
-                                locations = torch.stack([patch['location'] for patch in subject_patches])
-                                batch = collate_subjects(subject_patches, image_names=['X'], device=context.device)
-                                with torch.no_grad():
-                                    y_pred_patch = context.model(batch['X'])
-                                aggregator.add_batch(y_pred_patch, locations)
+                            aggregated_patch = self.patch_predict(context, subject, validation_patch_batch_size)
                             y_pred = copy.deepcopy(y_sample)
-                            y_pred.set_data(aggregator.get_output_tensor().cpu())
+                            y_pred.set_data(aggregated_patch)
                             subject['y_pred'] = y_pred
                             self.add_evaluation_labels(subject)
                             validation_subjects.append(subject)
@@ -337,6 +322,24 @@ class SegmentationTrainer:
             y_pred.set_data(batch['y_pred'][i].detach().cpu())
             subject['y_pred'] = y_pred
             self.add_evaluation_labels(subject)
+
+    def patch_predict(self, context, subject, patch_batch_size):
+        grid_sampler = tio.GridSampler(subject,
+                                       self.patch_size,
+                                       self.validation_patch_overlap,
+                                       self.validation_padding_mode)
+        patch_loader = DataLoader(grid_sampler,
+                                  batch_size=patch_batch_size,
+                                  collate_fn=dont_collate)
+        aggregator = tio.GridAggregator(grid_sampler, overlap_mode=self.validation_overlap_mode)
+        for subject_patches in patch_loader:
+            locations = torch.stack([patch['location'] for patch in subject_patches])
+            batch = collate_subjects(subject_patches, image_names=['X'], device=context.device)
+            with torch.no_grad():
+                y_pred_patch = context.model(batch['X'])
+            aggregator.add_batch(y_pred_patch, locations)
+
+        return aggregator.get_output_tensor().cpu()
 
     def add_evaluation_labels(self, subject):
         transform = subject.get_composed_history()

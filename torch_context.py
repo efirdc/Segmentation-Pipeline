@@ -70,7 +70,8 @@ class TorchContext:
         self.config = {}
 
         if file_path is not None:
-            checkpoint = torch.load(file_path)
+            checkpoint = torch.load(file_path, map_location=torch.device(self.device))
+
 
             self.name = checkpoint["name"]
             self.component_definitions = checkpoint['component_definitions']

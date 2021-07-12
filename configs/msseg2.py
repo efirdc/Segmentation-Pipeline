@@ -35,7 +35,7 @@ def get_context(device, variables, fold=0, **kwargs):
     ])
 
     cohorts = {}
-    cohorts['all'] = RequireAttributes(input_images + output_labels)
+    cohorts['all'] = RequireAttributes(input_images)
     cohorts['validation'] = RandomFoldFilter(num_folds=5, selection=fold, seed=0xDEADBEEF)
     cohorts['training'] = NegateFilter(cohorts['validation'])
 
@@ -47,6 +47,7 @@ def get_context(device, variables, fold=0, **kwargs):
 
     common_transforms_2 = tio.Compose([
         CropToMask('brain_mask'),
+        MinSizePad(config['patch_size']),
         tio.RescaleIntensity((-1, 1.), (0.0, 99.5)),
         ConcatenateImages(image_names=["flair_time01", "flair_time02"], image_channels=[1, 1], new_image_name="X"),
         RenameProperty(old_name='ground_truth', new_name='y'),
