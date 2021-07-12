@@ -111,6 +111,7 @@ class SegmentationTrainer:
             num_workers=0,
             validation_batch_size=16,
             validation_patch_batch_size=32,
+            patch_queue_length=100,
             logger=NonLogger(),
             **kwargs
     ):
@@ -134,7 +135,6 @@ class SegmentationTrainer:
             validation_dataset.preload_and_transform_subjects()
             print(f"Done. Took {round(time.time() - t, 2)}s")
 
-
         # Make dataloader for training dataset
         if not self.enable_patch_mode:
             training_dataloader = DataLoader(dataset=training_dataset,
@@ -144,7 +144,7 @@ class SegmentationTrainer:
                                              num_workers=num_workers)
         else:
             queue = tio.Queue(training_dataset,
-                              max_length=100,
+                              max_length=patch_queue_length,
                               samples_per_volume=self.training_patches_per_volume,
                               sampler=self.training_patch_sampler,
                               num_workers=num_workers)
