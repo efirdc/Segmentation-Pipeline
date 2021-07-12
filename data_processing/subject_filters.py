@@ -185,6 +185,10 @@ class NegateFilter(SubjectFilter):
 class RandomFoldFilter(SubjectFilter):
     """Splits subjects into folds in a deterministic random way.
 
+    Adds an int property ``"fold"`` to the subjects the first time this filter is applied.
+    Subsequent fold filters do not re-assign the fold, they only select subjects based on
+    the previously assigned fold.
+
     Args:
         num_folds: Subjects are split into this many evenly sized folds.
         selection: Subjects not in these folds are filtered (0 indexed)
@@ -203,13 +207,18 @@ class RandomFoldFilter(SubjectFilter):
         assert all(0 <= sel < self.num_folds for sel in self.selection)
 
     def apply_filter(self, subjects):
+        folds_assigned = any('fold' in subject for subject in subjects)
 
-        fold_ids = [i % self.num_folds for i in range(len(subjects))]
-        Random(self.seed).shuffle(fold_ids)
+        if not folds_assigned:
+            fold_ids = [i % self.num_folds for i in range(len(subjects))]
+            Random(self.seed).shuffle(fold_ids)
+
+            for i in range(len(subjects)):
+                subjects[i]['fold'] = fold_ids[i]
 
         subjects = [
-            subject for subject, fold_id in zip(subjects, fold_ids)
-            if fold_id in self.selection
+            subject for subject in subjects
+            if 'fold' in subject and subject['fold'] in self.selection
         ]
 
         return subjects
