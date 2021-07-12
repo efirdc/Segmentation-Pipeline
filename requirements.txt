@@ -4,7 +4,9 @@ numpy
 pandas
 Pillow
 RandomWords
+scikit-image
 torch
 torchio
+torchvision
 wandb
 

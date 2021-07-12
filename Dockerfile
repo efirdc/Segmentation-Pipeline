@@ -8,7 +8,6 @@ WORKDIR /Segmentation-Pipeline
 RUN wget -q https://github.com/Inria-Visages/Anima-Public/releases/download/v4.0.1/Anima-Ubuntu-4.0.1.zip
 RUN unzip Anima-Ubuntu-4.0.1.zip
 RUN git lfs install
-RUN git clone --depth 1 https://github.com/Inria-Visages/Anima-Scripts-Public.git
 RUN git clone --depth 1 https://github.com/Inria-Visages/Anima-Scripts-Data-Public.git
 RUN mkdir /root/.anima/
 

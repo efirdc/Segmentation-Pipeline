@@ -8,9 +8,6 @@ from typing import Type, Sequence
 
 import torch
 import torchio as tio
-import pandas as pd
-from PIL import Image
-import wandb
 
 from transforms import CustomSequentialLabels
 
@@ -59,6 +56,10 @@ def slice_volume(x: torch.tensor, channel_id: int, plane: str, slice_id: int):
         return torch.rot90(x[channel_id, :, slice_id, :])
     elif plane == "Saggital":
         return torch.rot90(x[channel_id, slice_id, :, :])
+
+
+def dont_collate(subjects):
+    return subjects
 
 
 class Timer:
