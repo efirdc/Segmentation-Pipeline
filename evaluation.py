@@ -36,7 +36,6 @@ class HybridLogisticDiceLoss(nn.Module):
         if self.logistic_class_weights is not None:
             weights = torch.tensor(self.logistic_class_weights)[None]
             weights = weights.to(logistic.device)
-            weights = weights / torch.sum(weights)
             logistic = logistic * weights
 
         logistic_loss = torch.mean(-logistic)
