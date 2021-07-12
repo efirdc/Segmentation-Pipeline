@@ -73,7 +73,7 @@ def get_context(device, variables, fold=0, **kwargs):
     context.add_component("model", ModularUNet,
                           in_channels=2,
                           out_channels=2,
-                          filters=[32, 64, 128, 128, 128, 128],
+                          filters=[40, 40, 80, 80, 120, 120],
                           depth=6,
                           block_params={'residual': True},
                           downsample_class=BlurConv3d,
