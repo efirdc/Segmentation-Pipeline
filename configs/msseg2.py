@@ -117,7 +117,7 @@ def get_context(device, variables, fold=0, **kwargs):
         # Dice is (>0)/0 = posinf when the model incorrectly predicts lesions when there are none.
         # This is counted as a score of 0.0.
         dice = torch.tensor(seg_eval["subject_stats"]['dice.lesion'])
-        dice.nan_to_num(nan=1.0, posinf=0.0)
+        dice = dice.nan_to_num(nan=1.0, posinf=0.0)
         score = dice.mean()
 
         return score
