@@ -43,7 +43,7 @@ class SubjectFolder(Dataset):
         self.root = root
         self.subject_path = os.path.join(self.root, subject_path)
         self.subject_loader = subject_loader
-        self.cohorts = cohorts
+        self.cohorts = {} if cohorts is None else cohorts
         self.transforms = transforms
 
         self._preloaded = False
@@ -78,6 +78,7 @@ class SubjectFolder(Dataset):
         self.set_all_subjects(subjects)
 
     def set_all_subjects(self, subjects):
+        subjects.sort(key=lambda subject: subject['name'])
         self.all_subjects = subjects
         self.all_subjects_map = {subject['name']: subject for subject in subjects}
         self.set_cohort(self.active_cohort)

@@ -73,7 +73,7 @@ class WandbLogger(Logger):
         sub_dir = os.path.join(self.save_folder, sub_folder)
         if not os.path.exists(sub_dir):
             os.makedirs(sub_dir)
-        file_path = os.path.join(sub_dir, f"iter{iteration:08}.pt")
+        file_path = os.path.join(sub_dir, f"{context.name}-iter{iteration:08}.pt")
         context.save(file_path)
         wandb.save(file_path)
 

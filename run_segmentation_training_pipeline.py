@@ -71,6 +71,9 @@ if __name__ == "__main__":
     parser.add_argument("--validation_batch_size", type=int, default=4,
                         help="How many validation subjects should be run through the model at once."
                         )
+    parser.add_argument("--patch_queue_length", type=int, default=100,
+                        help="How many volumes should be loaded into the queue for patch based training."
+                        )
     args, unknown_args = parser.parse_known_args()
 
     # Parse extra unknown keyword arguments that were passed on the command line
@@ -148,4 +151,5 @@ if __name__ == "__main__":
                           num_workers=args.num_workers,
                           validation_batch_size=args.validation_batch_size,
                           validation_patch_batch_size=args.validation_batch_size,
+                          patch_queue_length=args.patch_queue_length,
                           logger=logger)

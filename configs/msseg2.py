@@ -6,7 +6,7 @@ import torch
 
 from torch_context import TorchContext
 from segmentation_trainer import SegmentationTrainer, ScheduledEvaluation
-from models import NestedResUNet
+from models import *
 from evaluation import HybridLogisticDiceLoss
 from transforms import *
 from data_processing import *
@@ -22,7 +22,6 @@ def get_context(device, variables, fold=0, **kwargs):
     }
 
     input_images = ["flair_time01", "flair_time02"]
-    output_labels = ["ground_truth"]
 
     subject_loader = ComposeLoaders([
         ImageLoader(glob_pattern="flair_time01*", image_name='flair_time01', image_constructor=tio.ScalarImage),
@@ -42,6 +41,7 @@ def get_context(device, variables, fold=0, **kwargs):
     common_transforms_1 = tio.Compose([
         SetDataType(torch.float),
         EnforceConsistentAffine(source_image_name='flair_time01'),
+        TargetResample(target_spacing=1, tolerance=0.11),
     ])
 
     common_transforms_2 = tio.Compose([
@@ -53,20 +53,13 @@ def get_context(device, variables, fold=0, **kwargs):
         CustomOneHot(include="y"),
     ])
 
-    isotropic_params = {'tolerance': 0.15, 'min_spacing': 0.85}
     transforms = {
         'default': tio.Compose([
             common_transforms_1,
-            IsotropicResample(spacing_mode='median', **isotropic_params),
             common_transforms_2
         ]),
         'training': tio.Compose([
             common_transforms_1,
-            tio.OneOf({
-                IsotropicResample(spacing_mode='median', **isotropic_params): 0.5,
-                IsotropicResample(spacing_mode='min', **isotropic_params): 0.25,
-                IsotropicResample(spacing_mode='max', **isotropic_params): 0.25,
-            }),
             common_transforms_2,
             ImageFromLabels(
                 new_image_name="patch_probability",
@@ -77,10 +70,18 @@ def get_context(device, variables, fold=0, **kwargs):
 
     context.add_component("dataset", SubjectFolder, root='$DATASET_PATH', subject_path="",
                           subject_loader=subject_loader, cohorts=cohorts, transforms=transforms)
-    context.add_component("model", NestedResUNet, input_channels=2, output_channels=2,
-                          filters=40, dropout_p=0.2, saggital_split=False)
-    context.add_component("optimizer", SGD, params="self.model.parameters()", lr=0.01, momentum=0.95)
-    context.add_component("criterion", HybridLogisticDiceLoss, logistic_class_weights=[1, 2500])
+    context.add_component("model", ModularUNet,
+                          in_channels=2,
+                          out_channels=2,
+                          filters=[40, 40, 80, 80, 120, 120],
+                          depth=6,
+                          block_params={'residual': True},
+                          downsample_class=BlurConv3d,
+                          downsample_params={'kernel_size': 3, 'stride': 2, 'padding': 1},
+                          upsample_class=BlurConvTranspose3d,
+                          upsample_params={'kernel_size': 3, 'stride': 2, 'padding': 1, 'output_padding': 0})
+    context.add_component("optimizer", SGD, params="self.model.parameters()", lr=0.001, momentum=0.95)
+    context.add_component("criterion", HybridLogisticDiceLoss, logistic_class_weights=[1, 100])
 
     training_evaluators = [
         ScheduledEvaluation(evaluator=SegmentationEvaluator('y_pred_eval', 'y_eval'),
@@ -91,20 +92,20 @@ def get_context(device, variables, fold=0, **kwargs):
                                                             slice_id=0, legend=True, ncol=2, interesting_slice=True,
                                                             split_subjects=False),
                             log_name=f"contour_image",
-                            interval=1),
+                            interval=15),
     ]
 
     validation_evaluators = [
         ScheduledEvaluation(evaluator=SegmentationEvaluator("y_pred_eval", "y_eval"),
                             log_name="segmentation_eval",
                             cohorts=["validation"],
-                            interval=25),
+                            interval=50),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("interesting", 'flair_time02', 'y_pred_eval', 'y_eval',
                                                             slice_id=0, legend=True, ncol=1, interesting_slice=True,
                                                             split_subjects=True),
                             log_name=f"contour_image",
                             cohorts=["validation"],
-                            interval=10),
+                            interval=50),
     ]
 
     def scoring_function(evaluation_dict):
@@ -113,10 +114,10 @@ def get_context(device, variables, fold=0, **kwargs):
 
         # Take mean dice, while accounting for subjects which have no lesions.
         # Dice is 0/0 = nan when the model correctly outputs no lesions. This is counted as a score of 1.0.
-        # Dice is (>0)/0 = inf when the model incorrectly predicts lesions when there are none.
+        # Dice is (>0)/0 = posinf when the model incorrectly predicts lesions when there are none.
         # This is counted as a score of 0.0.
         dice = torch.tensor(seg_eval["subject_stats"]['dice.lesion'])
-        dice.nan_to_num(nan=1.0, posinf=0.0)
+        dice = dice.nan_to_num(nan=1.0, posinf=0.0)
         score = dice.mean()
 
         return score
@@ -130,13 +131,13 @@ def get_context(device, variables, fold=0, **kwargs):
                           one_time_evaluators=[],
                           training_evaluators=training_evaluators,
                           validation_evaluators=validation_evaluators,
-                          max_iterations_with_no_improvement=500,
+                          max_iterations_with_no_improvement=2000,
                           enable_patch_mode=True,
                           patch_size=config['patch_size'],
                           training_patch_sampler=patch_sampler,
                           training_patches_per_volume=1,
-                          inference_patch_overlap=(config['patch_size'] // 8),
-                          inference_padding_mode=None,
-                          inference_overlap_mode='average')
+                          validation_patch_overlap=(config['patch_size'] // 8),
+                          validation_padding_mode=None,
+                          validation_overlap_mode='average')
 
     return context
