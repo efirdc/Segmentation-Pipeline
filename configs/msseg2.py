@@ -46,6 +46,7 @@ def get_context(device, variables, fold=0, **kwargs):
 
     common_transforms_2 = tio.Compose([
         CropToMask('brain_mask'),
+        MinSizePad(config['patch_size']),
         tio.RescaleIntensity((-1, 1.), (0.0, 99.5)),
         ConcatenateImages(image_names=["flair_time01", "flair_time02"], image_channels=[1, 1], new_image_name="X"),
         RenameProperty(old_name='ground_truth', new_name='y'),
