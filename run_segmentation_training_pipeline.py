@@ -59,6 +59,9 @@ if __name__ == "__main__":
                         help="Project name for logger."
                         )
     parser.add_argument("--logging_dir", type=str, help="Path to directory for saving checkpoints.")
+    parser.add_argument("--group_name", type=str, default=None,
+                        help="Optional name for grouping runs."
+                        )
     parser.add_argument("--preload_training_data", type=bool, default=False,
                         help="Optionally preload the entire training dataset into memory."
                         )
@@ -82,6 +85,10 @@ if __name__ == "__main__":
     for i in range(0, len(unknown_args), 2):
         name = unknown_args[i]
         value = unknown_args[i + 1]
+        if value.isdigit():
+            value = int(value)
+        elif value.isnumeric():
+            value = float(value)
         assert name.startswith('--'), f"Extra arguments must start with '--', found: {name}"
         extra_args[name[2:]] = value
 
@@ -138,7 +145,7 @@ if __name__ == "__main__":
     context.init_components()
 
     if args.logger == 'wandb':
-        logger = WandbLogger(args.project_name, args.logging_dir)
+        logger = WandbLogger(args.project_name, args.logging_dir, group_name=args.group_name)
     else:
         logger = NonLogger()
 
