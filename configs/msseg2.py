@@ -42,12 +42,27 @@ def get_context(device, variables, fold=0, **kwargs):
         SetDataType(torch.float),
         EnforceConsistentAffine(source_image_name='flair_time01'),
         TargetResample(target_spacing=1, tolerance=0.11),
+        CropToMask('brain_mask'),
+        MinSizePad(config['patch_size'])
+    ])
+
+    augmentations = tio.Compose([
+        RandomPermuteDimensions(),
+        tio.RandomFlip(axes=(0, 1, 2)),
+        tio.OneOf({
+            tio.RandomElasticDeformation(): 0.2,
+            tio.RandomAffine(scales=0.2, degrees=45, default_pad_value='otsu'): 0.8,
+        }, p=0.75),
+        tio.RandomBiasField(p=0.5),
+        tio.RescaleIntensity((0, 1), (0.01, 99.9)),
+        tio.RandomGamma(p=0.8),
+        tio.RescaleIntensity((-1, 1)),
+        tio.RandomBlur((0, 1), p=0.2),
+        tio.RandomNoise(std=0.1, p=0.35)
     ])
 
     common_transforms_2 = tio.Compose([
-        CropToMask('brain_mask'),
-        MinSizePad(config['patch_size']),
-        tio.RescaleIntensity((-1, 1.), (0.0, 99.5)),
+        tio.RescaleIntensity((-1, 1.), (0.05, 99.5)),
         ConcatenateImages(image_names=["flair_time01", "flair_time02"], image_channels=[1, 1], new_image_name="X"),
         RenameProperty(old_name='ground_truth', new_name='y'),
         CustomOneHot(include="y"),
@@ -60,6 +75,7 @@ def get_context(device, variables, fold=0, **kwargs):
         ]),
         'training': tio.Compose([
             common_transforms_1,
+            augmentations,
             common_transforms_2,
             ImageFromLabels(
                 new_image_name="patch_probability",
