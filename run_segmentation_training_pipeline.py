@@ -85,6 +85,10 @@ if __name__ == "__main__":
     for i in range(0, len(unknown_args), 2):
         name = unknown_args[i]
         value = unknown_args[i + 1]
+        if value.isdigit():
+            value = int(value)
+        elif value.isnumeric():
+            value = float(value)
         assert name.startswith('--'), f"Extra arguments must start with '--', found: {name}"
         extra_args[name[2:]] = value
 
