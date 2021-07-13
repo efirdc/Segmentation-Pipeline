@@ -59,6 +59,9 @@ if __name__ == "__main__":
                         help="Project name for logger."
                         )
     parser.add_argument("--logging_dir", type=str, help="Path to directory for saving checkpoints.")
+    parser.add_argument("--group_name", type=str, default=None,
+                        help="Optional name for grouping runs."
+                        )
     parser.add_argument("--preload_training_data", type=bool, default=False,
                         help="Optionally preload the entire training dataset into memory."
                         )
@@ -138,7 +141,7 @@ if __name__ == "__main__":
     context.init_components()
 
     if args.logger == 'wandb':
-        logger = WandbLogger(args.project_name, args.logging_dir)
+        logger = WandbLogger(args.project_name, args.logging_dir, group_name=args.group_name)
     else:
         logger = NonLogger()
 

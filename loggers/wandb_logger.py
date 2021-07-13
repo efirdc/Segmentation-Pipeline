@@ -1,5 +1,6 @@
 import os
 import warnings
+from typing import Optional
 
 import wandb
 from random_words import RandomWords
@@ -33,15 +34,20 @@ class WandbLogger(Logger):
     def __init__(
             self,
             project_name: str,
-            logging_dir: str
+            logging_dir: str,
+            group_name: Optional[str] = None
     ):
         self.project_name = project_name
         self.logging_dir = logging_dir
+        self.group_name = group_name
 
     def setup(self, context):
         wandb_params = {
             'project': self.project_name,
         }
+
+        if self.group_name is not None:
+            wandb_params['group'] = self.group_name
 
         resuming_previous_run = 'wandb_id' in context.metadata
         if not resuming_previous_run:
@@ -55,7 +61,10 @@ class WandbLogger(Logger):
             wandb_params['resume'] = 'allow'
 
         # Initialize directories for saving data
-        self.save_folder = os.path.join(self.logging_dir, self.project_name, context.name)
+        if self.group_name is None:
+            self.save_folder = os.path.join(self.logging_dir, self.project_name, context.name)
+        else:
+            self.save_folder = os.path.join(self.logging_dir, self.project_name, self.group_name, context.name)
         if not os.path.exists(self.save_folder):
             os.makedirs(self.save_folder)
 
