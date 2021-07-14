@@ -224,7 +224,7 @@ class SegmentationTrainer:
                         validation_subjects += subjects
                     else:
                         for subject in subjects:
-                            aggregated_patch = self.patch_predict(context, subject, validation_patch_batch_size)
+                            aggregated_patch = self.patch_predict(context, subject, validation_patch_batch_size, self.validation_patch_overlap)
                             y_pred = copy.deepcopy(y_sample)
                             y_pred.set_data(aggregated_patch)
                             subject['y_pred'] = y_pred
@@ -323,10 +323,10 @@ class SegmentationTrainer:
             subject['y_pred'] = y_pred
             self.add_evaluation_labels(subject)
 
-    def patch_predict(self, context, subject, patch_batch_size):
+    def patch_predict(self, context, subject, patch_batch_size, patch_overlap):
         grid_sampler = tio.GridSampler(subject,
                                        self.patch_size,
-                                       self.validation_patch_overlap,
+                                       patch_overlap,
                                        self.validation_padding_mode)
         patch_loader = DataLoader(grid_sampler,
                                   batch_size=patch_batch_size,

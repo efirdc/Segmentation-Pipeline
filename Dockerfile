@@ -1,4 +1,4 @@
-FROM python:3.7.10-slim-buster
+FROM python:3.8-slim-buster
 
 RUN apt-get update && apt-get install -y --no-install-recommends apt-utils ca-certificates wget unzip git git-lfs
 RUN update-ca-certificates
@@ -13,9 +13,9 @@ RUN mkdir /root/.anima/
 
 COPY config.txt /root/.anima
 
-COPY requirements.txt /Segmentation-Pipeline
+COPY docker-requirements.txt /Segmentation-Pipeline
 
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install -r docker-requirements.txt
 
 COPY . .
 
