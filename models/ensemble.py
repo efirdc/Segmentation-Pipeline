@@ -26,7 +26,7 @@ def apply_strategy(
     elif strategy == 'majority':
         C = predictions.shape[2]
         y = torch.argmax(predictions, dim=2)       # (E, N, ...)
-        y = torch.mode(y, dim=0)                   # (N, ...)
+        y = torch.mode(y, dim=0).values                   # (N, ...)
         y = F.one_hot(y, num_classes=C)            # (N, ..., C)
         y = y.moveaxis(-1, 1)                      # (N, C, ...)
         return y
