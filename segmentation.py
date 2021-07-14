@@ -1,5 +1,5 @@
 import copy
-from typing import Sequence, Dict, Union
+from typing import Sequence, Dict, Union, Any, Optional
 
 import torch
 from torch import nn
@@ -48,14 +48,18 @@ def seg_predict(
 
 def patch_predict(
         model: nn.Module,
+        device: torch.device,
         subjects: Sequence[tio.Subject],
-        y_sample: tio.LabelMap,
+        label_attributes: Optional[Dict[str, Any]] = None,
         patch_batch_size: int = 16,
         patch_size: TypePatchSize = None,
         patch_overlap: TypePatchSize = (0, 0, 0),
         padding_mode: Union[str, float, None] = None,
         overlap_mode: str = 'average',
 ):
+    if label_attributes is None:
+        label_attributes = {}
+
     for subject in subjects:
         grid_sampler = tio.GridSampler(subject,
                                        patch_size,
@@ -68,15 +72,15 @@ def patch_predict(
 
         for subject_patches in patch_loader:
             locations = torch.stack([patch['location'] for patch in subject_patches])
-            batch = collate_subjects(subject_patches, image_names=['X'], device=model.device)
+            batch = collate_subjects(subject_patches, image_names=['X'], device=device)
             with torch.no_grad():
                 y_pred_patch = model(batch['X'])
             aggregator.add_batch(y_pred_patch, locations)
 
         aggregated_patch = aggregator.get_output_tensor().cpu()
-        y_pred = copy.deepcopy(y_sample)
-        y_pred.set_data(aggregated_patch)
-        subject['y_pred'] = y_pred
+        y_pred = tio.LabelMap(tensor=aggregated_patch, **label_attributes)
+        subject.add_image(y_pred, 'y_pred')
+        EnforceConsistentAffine(source_image_name='X')(subject)
 
 
 def add_evaluation_labels(subjects: Sequence[tio.Subject]):

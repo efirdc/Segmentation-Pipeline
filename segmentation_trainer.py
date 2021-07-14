@@ -175,7 +175,7 @@ class SegmentationTrainer:
             timer.stamp("data_loading")
 
             context.model.train()
-            seg_predict(context.model, batch, subjects, y_sample)
+            seg_predict(context, batch, subjects, y_sample)
             timer.stamp("model_forward")
 
             loss_dict = context.criterion(batch['y_pred'], batch['y'])
@@ -222,9 +222,9 @@ class SegmentationTrainer:
                     for subjects in validation_dataloader:
                         if not self.enable_patch_mode:
                             batch = collate_subjects(subjects, image_names=['X'], device=context.device)
-                            seg_predict(context.model, batch, subjects, y_sample)
+                            seg_predict(context, batch, subjects, y_sample)
                         else:
-                            patch_predict(context.model, subjects, y_sample,
+                            patch_predict(context, subjects, y_sample,
                                           patch_batch_size=validation_patch_batch_size,
                                           patch_size=self.patch_size,
                                           patch_overlap=self.validation_patch_overlap,
