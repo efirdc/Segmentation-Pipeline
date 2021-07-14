@@ -87,7 +87,7 @@ class SegmentationTrainer:
         self.validation_overlap_mode = validation_overlap_mode
 
         self.iteration = 0
-        self.max_score = -1
+        self.max_score = float('-inf')
         self.max_score_iteration = -1
 
     def state_dict(self):

@@ -77,6 +77,9 @@ if __name__ == "__main__":
     parser.add_argument("--patch_queue_length", type=int, default=100,
                         help="How many volumes should be loaded into the queue for patch based training."
                         )
+    parser.add_argument("--force_continue", type=bool, default=False,
+                        help="Force the model to continue training by resetting the max score on the trainer."
+                        )
     args, unknown_args = parser.parse_known_args()
 
     # Parse extra unknown keyword arguments that were passed on the command line
@@ -143,6 +146,9 @@ if __name__ == "__main__":
     else:
         context = TorchContext(device, file_path=args.load_checkpoint, variables=variables)
     context.init_components()
+
+    if args.force_continue:
+        context.trainer.max_score = float('-inf')
 
     if args.logger == 'wandb':
         logger = WandbLogger(args.project_name, args.logging_dir, group_name=args.group_name)
