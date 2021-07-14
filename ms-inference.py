@@ -3,7 +3,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
-CONTEXT_PATH = Path("/Segmentation-Pipeline/saved_models/ms-seg.pt")
+CONTEXT_PATH = Path("/Segmentation-Pipeline/saved_models/ensemble")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Detect new MS lesions from two FLAIR images.")
