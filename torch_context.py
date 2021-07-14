@@ -227,8 +227,10 @@ class TorchContext:
     def __repr__(self):
         out = f'TorchContext {self.name} created at {self.creation_time}\n'
         for i, component_definition in enumerate(self.component_definitions):
+            filtered_defintion = {k: v for k, v in component_definition.items()
+                                  if k != "state_dict"}
             out += f'\ncomponent_id={i}\n'
-            out += f'component_defintition={pformat(component_definition, 4)}\n'
+            out += f'component_defintition={pformat(filtered_defintion, 4)}\n'
             component = self.__dict__[component_definition['name']] if self.loaded else 'not loaded'
             out += f'component={component}\n'
         return out
