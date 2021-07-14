@@ -65,7 +65,14 @@ def remove_holes(img, hole_size, max_dilations=100):
 
     return img, total_holes
 
-    return img
+
+def remove_small_components(img, component_size, max_dilations=100):
+    img = img.copy()
+    inverted_img = img == 0
+    holes_removed, counts = remove_holes(inverted_img, component_size, max_dilations=max_dilations)
+    img[holes_removed] = 0
+    return img, counts
+
 
 def lateral_uniformity(seg, prob, return_counts=False):
     seg = seg.clone()
