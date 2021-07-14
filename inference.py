@@ -10,7 +10,7 @@ from tqdm import tqdm
 from data_processing import *
 from post_processing import *
 from torch_context import TorchContext
-from utils import collate_subjects, dont_collate
+from segmentation import collate_subjects, dont_collate
 
 
 def segmentation_predict(context, input_data):
@@ -123,7 +123,7 @@ if __name__ == "__main__":
             if args.remove_isolated_components:
                 num_components = out.max()
                 out, components_removed, component_voxels_removed = keep_components(
-                    out, num_components, return_counts=True
+                    out, num_components
                 )
                 pbar.write(
                     f"\tRemoved {component_voxels_removed} voxels from "
@@ -131,7 +131,7 @@ if __name__ == "__main__":
                 )
 
             if args.remove_holes:
-                out, hole_voxels_removed = remove_holes(out, hole_size=64, return_counts=True)
+                out, hole_voxels_removed = remove_holes(out, hole_size=64)
                 pbar.write(f"\tFilled {hole_voxels_removed} voxels from detected holes.")
 
             out = torch.from_numpy(out).unsqueeze(0)
