@@ -2,7 +2,7 @@
     "name": "MS_Lesion_Seg",
     "description": "Detect new MS lesions from two FLAIR images. Developed my team macewan-im",
     "author": "Cory Efird, Dylan Miller, Dana Cobzas (macewan-im)",
-    "tool-version": "1.0.0",
+    "tool-version": "1.1.0",
     "schema-version": "0.5",
     "command-line": "python /Segmentation-Pipeline/ms-run.py -t1 [FLAIR1] -t2 [FLAIR2] -o [SEGMENTATION]",
     "container-image": {
