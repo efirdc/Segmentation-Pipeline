@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import os
 from pathlib import Path
 
@@ -8,9 +9,11 @@ from torch.utils.data import DataLoader, SequentialSampler
 from tqdm import tqdm
 
 from data_processing import *
+from models.ensemble import Ensemble
 from post_processing import *
 from torch_context import TorchContext
-from utils import collate_subjects, dont_collate
+from transforms import *
+from segmentation import collate_subjects, dont_collate, filter_transform
 
 
 def segmentation_predict(context, input_data):
@@ -30,6 +33,62 @@ def prepare_output_folder(subject, out_folder):
         out_folder.mkdir(exist_ok=True, parents=True)
 
     return out_folder
+
+
+def get_test_time_transform():
+    for dim_perm in itertools.permutations((0, 1, 2)):
+        for flip_mask in itertools.product([False, True], repeat=3):
+            flip_axis = np.array([0, 1, 2])
+            axes_to_flip = flip_axis[np.array(flip_mask)]
+
+            transforms = [PermuteDimensions(dim_perm)]
+
+            if axes_to_flip.size != 0:
+                transforms.append(tio.Flip(tuple(axes_to_flip.tolist())))
+
+            composeTrans = tio.Compose(transforms)
+
+            yield composeTrans
+
+
+def getEnsembleContext(ensemble_path):
+    for file in ensemble_path.iterdir():
+
+        context = TorchContext(
+            device, file_path=file, variables=dict(DATASET_PATH=args.dataset_path, CHECKPOINTS_PATH="")
+        )
+        context.init_components()
+        models.append(context.model)
+
+    ensemble_model = Ensemble(models)
+
+    context.model = ensemble_model
+    return context
+
+
+def test_time_augmentation(context, subject):
+    results = []
+
+    for transform in get_test_time_transform():
+
+        augmented = transform(subject)
+
+        if context.trainer.enable_patch_mode:
+            probs = context.trainer.patch_predict(context, augmented, 8, 48)
+        else:
+            batch = collate_subjects(augmented, image_names=["X"], device=context.device)
+            probs = segmentation_predict(context, batch["X"])
+
+        output_tensor = probs.argmax(dim=0, keepdim=True).cpu()
+        lm_temp = tio.LabelMap(tensor=torch.rand(1, 1, 1, 1))
+        augmented.add_image(lm_temp, "label")
+        augmented.label.set_data(output_tensor)
+        back = augmented.apply_inverse_transform(warn=False)
+        results.append(back.label.data)
+
+    result = torch.stack(results).long()
+    out = result.mode(dim=0).values
+    return out
 
 
 if __name__ == "__main__":
@@ -75,6 +134,13 @@ if __name__ == "__main__":
         help="Output the raw probabilities from the network instead of converting them to a segmentation map",
     )
     parser.set_defaults(output_probabilities=False)
+    parser.add_argument(
+        "--disable-test-time-augmentation",
+        dest="test_time_augmentation",
+        action="store_false",
+        help="Disable test time augmentation where a prediction is the combination of multiple augmentations",
+    )
+    parser.set_defaults(test_time_augmentation=True)
     args = parser.parse_args()
 
     if args.device.startswith("cuda"):
@@ -87,12 +153,20 @@ if __name__ == "__main__":
         device = torch.device(args.device)
     print("using device", device)
 
-    context = TorchContext(
-        device, file_path=args.model_path, variables=dict(DATASET_PATH=args.dataset_path, CHECKPOINTS_PATH="")
-    )
+    model_path = Path(args.model_path)
+    models = []
+    if model_path.is_dir():
+        context = getEnsembleContext(model_path)
+    else:
 
-    context.init_components()
+        context = TorchContext(
+            device, file_path=model_path, variables=dict(DATASET_PATH=args.dataset_path, CHECKPOINTS_PATH="")
+        )
+        context.init_components()
+
     dataset = context.dataset
+    dataset.transforms["default"] = filter_transform(dataset.transforms["default"], exclude_types=[TargetResample])
+    dataset.set_transform("default")
 
     test_dataloader = DataLoader(
         dataset=dataset, batch_size=1, sampler=SequentialSampler(dataset), collate_fn=dont_collate
@@ -109,29 +183,30 @@ if __name__ == "__main__":
         pbar.write(f"subject {subject['name']}: ")
         out_folder = prepare_output_folder(subject, args.out_folder)
 
-        if context.trainer.enable_patch_mode:
-            probs = context.trainer.patch_predict(context, subject, 32)
-        else:
-            batch = collate_subjects(subjects, image_names=["X"], device=context.device)
-            probs = segmentation_predict(context, batch["X"])
+        if args.test_time_augmentation:
+            out = test_time_augmentation(context, subject)
+            out = out.squeeze().numpy()
 
-        if not args.output_probabilities:
+        else:
+            raise NotImplementedError
+            if context.trainer.enable_patch_mode:
+                probs = context.trainer.patch_predict(context, subject, 8, 12)
+            else:
+                batch = collate_subjects(subjects, image_names=["X"], device=context.device)
+                probs = segmentation_predict(context, batch["X"])
 
             out = torch.argmax(probs, dim=0)
             out = out.numpy()
+            out = torch.from_numpy(out).unsqueeze(0)
+            out = out.int()
+            image = tio.LabelMap(tensor=out)
+            inverse_transforms = subject.get_composed_history().inverse(warn=False)
+            image = inverse_transforms(image)
 
-            if args.remove_isolated_components:
-                num_components = out.max()
-                out, components_removed, component_voxels_removed = keep_components(
-                    out, num_components, return_counts=True
-                )
-                pbar.write(
-                    f"\tRemoved {component_voxels_removed} voxels from "
-                    f"{components_removed} detected isolated components."
-                )
+        if not args.output_probabilities:
 
             if args.remove_holes:
-                out, hole_voxels_removed = remove_holes(out, hole_size=64, return_counts=True)
+                out, hole_voxels_removed = remove_holes(out, hole_size=64)
                 pbar.write(f"\tFilled {hole_voxels_removed} voxels from detected holes.")
 
             out = torch.from_numpy(out).unsqueeze(0)
@@ -139,10 +214,11 @@ if __name__ == "__main__":
             image = tio.LabelMap(tensor=out)
 
         else:
+            raise NotImplementedError
             image = tio.ScalarImage(tensor=probs)
 
-        inverse_transforms = subject.get_composed_history().inverse(warn=False)
-        image = inverse_transforms(image)
+        # inverse_transforms = subject.get_composed_history().inverse(warn=False)
+        # image = inverse_transforms(image)
 
         orig_subject = dataset.subjects_map[subject["name"]]  # access subject without applying transformations
 

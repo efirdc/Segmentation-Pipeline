@@ -101,9 +101,11 @@ def get_context(device, variables, fold=0, **kwargs):
 
     training_evaluators = [
         ScheduledEvaluation(evaluator=SegmentationEvaluator('y_pred_eval', 'y_eval'),
-                            log_name='training_segmentation_eval'),
+                            log_name='training_segmentation_eval',
+                            interval=15),
         ScheduledEvaluation(evaluator=LabelMapEvaluator('y_pred_eval'),
-                            log_name='training_label_eval'),
+                            log_name='training_label_eval',
+                            interval=15),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("random", 'flair_time02', 'y_pred_eval', 'y_eval',
                                                             slice_id=0, legend=True, ncol=2, interesting_slice=True,
                                                             split_subjects=False),

@@ -15,7 +15,8 @@ from evaluators import *
 from data_processing import *
 from loggers import *
 from transforms import *
-from utils import Timer, filter_transform, collate_subjects, dont_collate
+from utils import Timer, filter_transform
+from segmentation import *
 
 
 EXIT = threading.Event()
@@ -86,7 +87,7 @@ class SegmentationTrainer:
         self.validation_overlap_mode = validation_overlap_mode
 
         self.iteration = 0
-        self.max_score = -1
+        self.max_score = float('-inf')
         self.max_score_iteration = -1
 
     def state_dict(self):
@@ -162,7 +163,9 @@ class SegmentationTrainer:
         # Grab an instance of the target label from the training dataset.
         # Some subjects in the validation set might not have it, so this is used to fill in attributes
         y_sample = training_dataset[0]['y']
-        y_sample.set_data(torch.ones(1, 1, 1, 1))
+        default_label = tio.LabelMap(tensor=torch.ones(1, 1, 1, 1))
+        label_attributes = {k: v for k, v in y_sample.items()
+                            if k not in default_label}
 
         # Training loop
         timer = Timer(context.device)
@@ -174,7 +177,7 @@ class SegmentationTrainer:
             timer.stamp("data_loading")
 
             context.model.train()
-            self.seg_predict(context.model, batch, subjects, y_sample)
+            subjects = seg_predict(context.model, batch, subjects, label_attributes)
             timer.stamp("model_forward")
 
             loss_dict = context.criterion(batch['y_pred'], batch['y'])
@@ -191,6 +194,8 @@ class SegmentationTrainer:
                 scheduled for scheduled in self.training_evaluators
                 if self.iteration % scheduled.interval == 0
             ]
+            if len(training_evaluators) > 0:
+                add_evaluation_labels(subjects)
             for scheduled in training_evaluators:
                 training_evaluations[scheduled.log_name] = scheduled.evaluator(subjects)
                 timer.stamp(f"evaluation.{scheduled.log_name}")
@@ -214,22 +219,22 @@ class SegmentationTrainer:
                                                    sampler=SequentialSampler(validation_dataset),
                                                    collate_fn=dont_collate,
                                                    num_workers=num_workers)
-
                 validation_subjects = []
-                for subjects in validation_dataloader:
-                    if not self.enable_patch_mode:
-                        batch = collate_subjects(subjects, image_names=['X'], device=context.device)
-                        with torch.no_grad():
-                            self.seg_predict(context.model, batch, subjects, y_sample)
+                with torch.no_grad():
+                    for subjects in validation_dataloader:
+                        if not self.enable_patch_mode:
+                            batch = collate_subjects(subjects, image_names=['X'], device=context.device)
+                            subjects = seg_predict(context, batch, subjects, y_sample)
+                        else:
+                            subjects = patch_predict(context.model, context.device, subjects,
+                                                     label_attributes=label_attributes,
+                                                     patch_batch_size=validation_patch_batch_size,
+                                                     patch_size=self.patch_size,
+                                                     patch_overlap=self.validation_patch_overlap,
+                                                     padding_mode=self.validation_padding_mode,
+                                                     overlap_mode=self.validation_overlap_mode)
+                        add_evaluation_labels(subjects)
                         validation_subjects += subjects
-                    else:
-                        for subject in subjects:
-                            aggregated_patch = self.patch_predict(context, subject, validation_patch_batch_size)
-                            y_pred = copy.deepcopy(y_sample)
-                            y_pred.set_data(aggregated_patch)
-                            subject['y_pred'] = y_pred
-                            self.add_evaluation_labels(subject)
-                            validation_subjects.append(subject)
 
                 validation_subjects_map = {subject['name']: subject for subject in validation_subjects}
                 timer.stamp('model_forward_evaluation')
@@ -312,51 +317,3 @@ class SegmentationTrainer:
                 filters.append(RequireAttributes({'name': subject_names}))
         subject_filter = AnyFilter(filters)
         return subject_filter
-
-    def seg_predict(self, model, batch, subjects, sample_y):
-        batch['y_pred'] = model(batch['X'])
-
-        for i in range(len(subjects)):
-            subject = subjects[i]
-            y_pred = copy.deepcopy(sample_y)
-            y_pred.set_data(batch['y_pred'][i].detach().cpu())
-            subject['y_pred'] = y_pred
-            self.add_evaluation_labels(subject)
-
-    def patch_predict(self, context, subject, patch_batch_size):
-        grid_sampler = tio.GridSampler(subject,
-                                       self.patch_size,
-                                       self.validation_patch_overlap,
-                                       self.validation_padding_mode)
-        patch_loader = DataLoader(grid_sampler,
-                                  batch_size=patch_batch_size,
-                                  collate_fn=dont_collate)
-        aggregator = tio.GridAggregator(grid_sampler, overlap_mode=self.validation_overlap_mode)
-        for subject_patches in patch_loader:
-            locations = torch.stack([patch['location'] for patch in subject_patches])
-            batch = collate_subjects(subject_patches, image_names=['X'], device=context.device)
-            with torch.no_grad():
-                y_pred_patch = context.model(batch['X'])
-            aggregator.add_batch(y_pred_patch, locations)
-
-        return aggregator.get_output_tensor().cpu()
-
-    def add_evaluation_labels(self, subject):
-        transform = subject.get_composed_history()
-        label_transform_types = [LabelTransform, CopyProperty, RenameProperty, ConcatenateImages]
-        label_transform = filter_transform(transform, include_types=label_transform_types)
-        inverse_label_transform = label_transform.inverse(warn=False)
-
-        evaluation_transform = tio.Compose([
-            inverse_label_transform,
-            CustomSequentialLabels(),
-            filter_transform(inverse_label_transform, exclude_types=[CustomRemapLabels]).inverse(warn=False)
-        ])
-
-        if 'y_pred' in subject:
-            pred_subject = tio.Subject({'y': subject['y_pred']})
-            subject['y_pred_eval'] = evaluation_transform(pred_subject)['y']
-
-        if 'y' in subject:
-            target_subject = tio.Subject({'y': subject['y']})
-            subject['y_eval'] = evaluation_transform(target_subject)['y']
