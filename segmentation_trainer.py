@@ -163,7 +163,9 @@ class SegmentationTrainer:
         # Grab an instance of the target label from the training dataset.
         # Some subjects in the validation set might not have it, so this is used to fill in attributes
         y_sample = training_dataset[0]['y']
-        y_sample.set_data(torch.ones(1, 1, 1, 1))
+        default_label = tio.LabelMap(tensor=torch.ones(1, 1, 1, 1))
+        label_attributes = {k: v for k, v in y_sample.items()
+                            if k not in default_label}
 
         # Training loop
         timer = Timer(context.device)
@@ -175,7 +177,7 @@ class SegmentationTrainer:
             timer.stamp("data_loading")
 
             context.model.train()
-            seg_predict(context, batch, subjects, y_sample)
+            subjects = seg_predict(context.model, batch, subjects, label_attributes)
             timer.stamp("model_forward")
 
             loss_dict = context.criterion(batch['y_pred'], batch['y'])
@@ -222,14 +224,15 @@ class SegmentationTrainer:
                     for subjects in validation_dataloader:
                         if not self.enable_patch_mode:
                             batch = collate_subjects(subjects, image_names=['X'], device=context.device)
-                            seg_predict(context, batch, subjects, y_sample)
+                            subjects = seg_predict(context, batch, subjects, y_sample)
                         else:
-                            patch_predict(context, subjects, y_sample,
-                                          patch_batch_size=validation_patch_batch_size,
-                                          patch_size=self.patch_size,
-                                          patch_overlap=self.validation_patch_overlap,
-                                          padding_mode=self.validation_padding_mode,
-                                          overlap_mode=self.validation_overlap_mode)
+                            subjects = patch_predict(context.model, context.device, subjects,
+                                                     label_attributes=label_attributes,
+                                                     patch_batch_size=validation_patch_batch_size,
+                                                     patch_size=self.patch_size,
+                                                     patch_overlap=self.validation_patch_overlap,
+                                                     padding_mode=self.validation_padding_mode,
+                                                     overlap_mode=self.validation_overlap_mode)
                         add_evaluation_labels(subjects)
                         validation_subjects += subjects
 
