@@ -58,10 +58,6 @@ def slice_volume(x: torch.tensor, channel_id: int, plane: str, slice_id: int):
         return torch.rot90(x[channel_id, slice_id, :, :])
 
 
-def dont_collate(subjects):
-    return subjects
-
-
 class Timer:
     def __init__(self, device):
         self.device = device
@@ -120,19 +116,6 @@ def filter_transform(
             )
         ])
     return transform
-
-
-def collate_subjects(
-        subjects: Sequence[tio.Subject],
-        image_names: Sequence[str],
-        device: torch.device
-        ):
-    batch = {}
-    for image_name in image_names:
-        data = torch.stack([subject[image_name]['data'] for subject in subjects])
-        data = data.to(device)
-        batch[image_name] = data
-    return batch
 
 
 def save_dataset_as_nn_unet(dataset, output_path, short_name, image_names, label_map_name,
