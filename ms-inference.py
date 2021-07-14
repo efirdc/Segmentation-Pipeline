@@ -4,7 +4,7 @@ from pathlib import Path
 import torchio as tio
 import torch
 
-from models import EnsembleModels, EnsembleOrientations
+from models import EnsembleModels, EnsembleFlips
 from post_processing import remove_holes, remove_small_components
 from torch_context import TorchContext
 from segmentation import patch_predict
@@ -51,9 +51,8 @@ if __name__ == "__main__":
         models.append(context.model)
     print("Loaded models.")
 
-    model = models[0]
-    # model = EnsembleModels(models, strategy='mean')
-    # model = EnsembleOrientations(model, strategy='mean')
+    models = [EnsembleFlips(model, strategy='majority') for model in models]
+    model = EnsembleModels(models, strategy='majority')
     dataset = context.dataset
 
     model.eval()
@@ -72,14 +71,14 @@ if __name__ == "__main__":
             out_folder.mkdir(exist_ok=True, parents=True)
 
         with torch.no_grad():
-            patch_predict(model=model,
-                          device=device,
-                          subjects=[subject],
-                          patch_batch_size=1,
-                          patch_size=96,
-                          patch_overlap=48,
-                          padding_mode="edge",
-                          overlap_mode="average")
+            subject = patch_predict(model=model,
+                                    device=device,
+                                    subjects=[subject],
+                                    patch_batch_size=1,
+                                    patch_size=96,
+                                    patch_overlap=48,
+                                    padding_mode="edge",
+                                    overlap_mode="average")[0]
 
         transform = subject.get_composed_history()
         inverse_transform = transform.inverse(warn=False)
@@ -93,8 +92,8 @@ if __name__ == "__main__":
         label_data, hole_voxels_removed = remove_holes(label_data, hole_size=64)
         print(f"Filled {hole_voxels_removed} voxels from detected holes.")
 
-        label_data, small_lesions_removed = remove_small_components(label_data, 2)
-        print(f"Removed {small_lesions_removed} voxels from small predictions less than size 2.")
+        label_data, small_lesions_removed = remove_small_components(label_data, 3)
+        print(f"Removed {small_lesions_removed} voxels from small predictions less than size 3.")
 
         label_data = torch.from_numpy(label_data[None]).int()
         output_label.set_data(label_data)

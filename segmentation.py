@@ -35,15 +35,22 @@ def seg_predict(
         model: nn.Module,
         batch: Dict[str, torch.tensor],
         subjects: Sequence[tio.Subject],
-        y_sample: tio.LabelMap
+        label_attributes: Optional[Dict[str, Any]] = None,
 ):
+    if label_attributes is None:
+        label_attributes = {}
+
     batch['y_pred'] = model(batch['X'])
 
+    out_subjects = []
     for i in range(len(subjects)):
         subject = subjects[i]
-        y_pred = copy.deepcopy(y_sample)
-        y_pred.set_data(batch['y_pred'][i].detach().cpu())
-        subject['y_pred'] = y_pred
+        y_pred = tio.LabelMap(tensor=batch['y_pred'][i].detach().cpu(), **label_attributes)
+        subject.add_image(y_pred, 'y_pred')
+        subject = EnforceConsistentAffine(source_image_name='X')(subject)
+        out_subjects.append(subject)
+
+    return out_subjects
 
 
 def patch_predict(
@@ -60,6 +67,7 @@ def patch_predict(
     if label_attributes is None:
         label_attributes = {}
 
+    out_subjects = []
     for subject in subjects:
         grid_sampler = tio.GridSampler(subject,
                                        patch_size,
@@ -80,7 +88,10 @@ def patch_predict(
         aggregated_patch = aggregator.get_output_tensor().cpu()
         y_pred = tio.LabelMap(tensor=aggregated_patch, **label_attributes)
         subject.add_image(y_pred, 'y_pred')
-        EnforceConsistentAffine(source_image_name='X')(subject)
+        subject = EnforceConsistentAffine(source_image_name='X')(subject)
+        out_subjects.append(subject)
+
+    return out_subjects
 
 
 def add_evaluation_labels(subjects: Sequence[tio.Subject]):
