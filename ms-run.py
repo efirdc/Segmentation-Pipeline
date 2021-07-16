@@ -6,7 +6,7 @@ import subprocess
 import torch
 
 
-CONTEXT_PATH = Path("/Segmentation-Pipeline/saved_models/ensemble")
+CONTEXT_PATH = Path("/Segmentation-Pipeline/saved_models/ensemble_02")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Detect new MS lesions from two FLAIR images.")
