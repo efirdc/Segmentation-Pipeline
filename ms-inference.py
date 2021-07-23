@@ -4,7 +4,7 @@ from pathlib import Path
 import torchio as tio
 import torch
 
-from models import EnsembleModels, EnsembleFlips
+from models import EnsembleModels, EnsembleFlips, EnsembleOrientations
 from post_processing import remove_holes, remove_small_components
 from torch_context import TorchContext
 from segmentation import patch_predict
@@ -81,7 +81,12 @@ if __name__ == "__main__":
         help="PyTorch device to use. Set to 'cpu' if there are issues with gpu usage. A specific gpu can be selected"
              " using 'cuda:0' or 'cuda:1' on a multi-gpu machine.",
     )
-    parser.add_argument("--ensemble_flips", default=False, action='store_true')
+    parser.add_argument(
+        "--ensemble_orientations",
+        type=str,
+        default="",
+        help="Either 'flips' or 'orientations'"
+    )
     parser.add_argument("--ensemble_folds", default=False, action='store_true')
     parser.add_argument("--cohort", type=str, default=None)
     args = parser.parse_args()
@@ -106,8 +111,11 @@ if __name__ == "__main__":
         context.keep_components(('model', 'dataset'))
         context.init_components()
 
-        if args.ensemble_flips:
+        if args.ensemble_orientations == 'orientations':
+            context.model = EnsembleOrientations(context.model, strategy='majority')
+        if args.ensemble_orientations == 'flips':
             context.model = EnsembleFlips(context.model, strategy='majority')
+
         contexts.append(context)
     print("Loaded models.")
 
