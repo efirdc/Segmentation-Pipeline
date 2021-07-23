@@ -199,3 +199,18 @@ class SubjectFolder(Dataset):
         if self.transform is not None:
             self._pretransformed = True
             self.set_all_subjects([self.transform(subject) for subject in self.subjects])
+
+    # TODO: Do this better.
+    def load_additional_data(self, path: str, subject_loader: SubjectLoader):
+
+        subject_names = os.listdir(path)
+        for subject_name in subject_names:
+
+            subject_folder = os.path.join(path, subject_name)
+            subject_data = dict(name=subject_name, folder=subject_folder)
+
+            subject_loader(subject_data)
+            del subject_data['name']
+            del subject_data['folder']
+
+            self.all_subjects_map[subject_name].update(subject_data)
