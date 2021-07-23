@@ -55,7 +55,6 @@ if __name__ == "__main__":
             processed_folder,
             "temp.nii",
             "--out_folder", output_folder,
-            "--keep_isolated_components"
         ]
     )
 
