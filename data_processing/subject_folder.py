@@ -51,8 +51,8 @@ class SubjectFolder(Dataset):
 
         # Loops through all subjects in the directory
         subjects = []
-        self.subject_names = os.listdir(self.subject_path)
-        for subject_name in self.subject_names:
+        subject_names = os.listdir(self.subject_path)
+        for subject_name in subject_names:
 
             # The subject_data dictionary will be used to initialize the tio.Subject
             subject_folder = os.path.join(self.subject_path, subject_name)
@@ -60,6 +60,11 @@ class SubjectFolder(Dataset):
 
             # Apply subject loaders
             self.subject_loader(subject_data)
+
+            # torchio doesn't like to load a subject with no images
+            if not any(isinstance(v, tio.Image) for v in subject_data.values()):
+                continue
+
             subjects.append(tio.Subject(**subject_data))
 
         if "all" in self.cohorts:
