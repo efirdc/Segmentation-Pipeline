@@ -149,6 +149,7 @@ if __name__ == "__main__":
 
     if args.force_continue:
         context.trainer.max_score = float('-inf')
+        context.trainer.max_score_iteration = context.trainer.iteration
 
     if args.logger == 'wandb':
         logger = WandbLogger(args.project_name, args.logging_dir, group_name=args.group_name)

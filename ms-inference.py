@@ -4,60 +4,15 @@ from pathlib import Path
 import torchio as tio
 import torch
 
-from models import EnsembleModels, EnsembleFlips
+from models import EnsembleModels, EnsembleFlips, EnsembleOrientations
 from post_processing import remove_holes, remove_small_components
 from torch_context import TorchContext
 from segmentation import patch_predict
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Auto Hippocampus Segmentation")
-    parser.add_argument("ensemble_path", type=str, help="Folder with models")
-    parser.add_argument("dataset_path", type=str, help="Path to the subjects data folders.")
-    parser.add_argument(
-        "output_filename",
-        type=str,
-        help="File name for segmentation output. Can specify .nii or .nii.gz if compression is desired.",
-    )
-    parser.add_argument("--out_folder", type=str, default="", help="Folder for output.")
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="cpu",
-        help="PyTorch device to use. Set to 'cpu' if there are issues with gpu usage. A specific gpu can be selected"
-             " using 'cuda:0' or 'cuda:1' on a multi-gpu machine.",
-    )
-    args = parser.parse_args()
+def inference(dataset, model):
 
-    if args.device.startswith("cuda"):
-        if torch.cuda.is_available():
-            device = torch.device(args.device)
-        else:
-            device = torch.device("cpu")
-            print("cuda not available, switched to cpu")
-    else:
-        device = torch.device(args.device)
-    print("using device", device)
-
-    ensemble_path = Path(args.ensemble_path)
-    models = []
-    for file_path in ensemble_path.iterdir():
-        context = TorchContext(
-            device, file_path=file_path, variables=dict(DATASET_PATH=args.dataset_path)
-        )
-        context.keep_components(('model', 'dataset'))
-        context.init_components()
-
-        models.append(context.model)
-    print("Loaded models.")
-
-    models = [EnsembleFlips(model, strategy='majority') for model in models]
-    model = EnsembleModels(models, strategy='majority')
-    dataset = context.dataset
-
-    model.eval()
     for i in range(len(dataset)):
-
         subject = dataset[i]
         untransformed_subject = dataset.subjects[i]
 
@@ -95,7 +50,7 @@ if __name__ == "__main__":
         label_data, small_lesions_removed = remove_small_components(label_data, 3)
         print(f"Removed {small_lesions_removed} voxels from small predictions less than size 3.")
 
-        label_data = torch.from_numpy(label_data[None]).int()
+        label_data = torch.from_numpy(label_data[None]).to(torch.int32)
         output_label.set_data(label_data)
 
         target_image = untransformed_subject.get_first_image()
@@ -107,3 +62,75 @@ if __name__ == "__main__":
         print()
 
         output_label.save(out_folder / args.output_filename)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Auto Hippocampus Segmentation")
+    parser.add_argument("ensemble_path", type=str, help="Folder with models")
+    parser.add_argument("dataset_path", type=str, help="Path to the subjects data folders.")
+    parser.add_argument(
+        "output_filename",
+        type=str,
+        help="File name for segmentation output. Can specify .nii or .nii.gz if compression is desired.",
+    )
+    parser.add_argument("--out_folder", type=str, default="", help="Folder for output.")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        help="PyTorch device to use. Set to 'cpu' if there are issues with gpu usage. A specific gpu can be selected"
+             " using 'cuda:0' or 'cuda:1' on a multi-gpu machine.",
+    )
+    parser.add_argument(
+        "--ensemble_orientations",
+        type=str,
+        default="",
+        help="Either 'flips' or 'orientations'"
+    )
+    parser.add_argument("--ensemble_folds", default=False, action='store_true')
+    parser.add_argument("--cohort", type=str, default=None)
+    args = parser.parse_args()
+    print(args)
+
+    if args.device.startswith("cuda"):
+        if torch.cuda.is_available():
+            device = torch.device(args.device)
+        else:
+            device = torch.device("cpu")
+            print("cuda not available, switched to cpu")
+    else:
+        device = torch.device(args.device)
+    print("using device", device)
+
+    ensemble_path = Path(args.ensemble_path)
+    contexts = []
+    for file_path in ensemble_path.iterdir():
+        context = TorchContext(
+            device, file_path=file_path, variables=dict(DATASET_PATH=args.dataset_path)
+        )
+        context.keep_components(('model', 'dataset'))
+        context.init_components()
+
+        if args.ensemble_orientations == 'orientations':
+            context.model = EnsembleOrientations(context.model, strategy='majority')
+        if args.ensemble_orientations == 'flips':
+            context.model = EnsembleFlips(context.model, strategy='majority')
+
+        contexts.append(context)
+    print("Loaded models.")
+
+    if args.ensemble_folds:
+        context = contexts[0]
+        models = [context.model for context in contexts]
+        context.model = EnsembleModels(models, strategy='majority')
+        context = [contexts]
+
+    for i, context in enumerate(contexts):
+        if args.cohort is None:
+            dataset = context.dataset
+        else:
+            dataset = context.dataset.get_cohort_dataset(args.cohort)
+        model = context.model
+        model.eval()
+        print(f"Running evaluation for context {i}")
+        inference(dataset, model)
