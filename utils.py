@@ -205,3 +205,14 @@ def save_dataset_as_nn_unet(dataset, output_path, short_name, image_names, label
         json.dump(json_dict, f, indent=4)
 
 
+def dont_collate(subjects):
+    return subjects
+
+
+def collate_subjects(subjects: Sequence[tio.Subject], image_names: Sequence[str], device: torch.device):
+    batch = {}
+    for image_name in image_names:
+        data = torch.stack([subject[image_name]["data"] for subject in subjects])
+        data = data.to(device)
+        batch[image_name] = data
+    return batch

@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader, RandomSampler
 from torch.optim import Adam
 
 from transforms import *
+from predictors import *
+from dataLoaderFactory import *
 
 
 def get_context(device, variables, **kwargs):
@@ -72,6 +74,13 @@ def get_context(device, variables, **kwargs):
                           saggital_split=False)
     context.add_component("optimizer", Adam, params="self.model.parameters()", lr=0.0002)
     context.add_component("criterion", HybridLogisticDiceLoss)
+
+    train_predictor = StandardPredict(device, image_names=['X', 'y'])
+    val_predictor = StandardPredict(device, image_names=['X'])
+
+    train_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)
+    val_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)
+
     context.add_component("trainer", SegmentationTrainer, save_folder="$CHECKPOINTS_PATH", sample_rate=50, save_rate=250,
                           val_datasets=[
                          dict(dataset="self.val_dataset", log_prefix="Val", preload=True, interval=50),
@@ -83,6 +92,10 @@ def get_context(device, variables, **kwargs):
                          dict(interval=50, log_name="image1",
                               plane="Coronal", image_name="qsm", slice=51, legend=True, ncol=1,
                               subjects=val_subjects),
-                     ])
+                     ], 
+                          train_predictor=train_predictor,
+                          val_predictor=val_predictor,
+                          train_dataloader_factory=train_dataloader_factory,
+                          val_dataloader_factory=val_dataloader_factory)
 
     return context

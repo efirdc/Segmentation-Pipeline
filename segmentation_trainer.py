@@ -3,21 +3,18 @@ import os
 import signal
 import threading
 from typing import Sequence, Callable, Union, Tuple
-import copy
 
 import torch
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 import torchio as tio
-from torchio.transforms.preprocessing.label.label_transform import LabelTransform
-from torchio.data.sampler.sampler import PatchSampler
 
 from evaluators import *
 from data_processing import *
 from loggers import *
 from transforms import *
-from utils import Timer, filter_transform
-from segmentation import *
-
+from utils import Timer
+from dataLoaderFactory import DataLoaderFactory
+from predictors import SegPredictor
+from segmentation import add_evaluation_labels
 
 EXIT = threading.Event()
 EXIT.clear()
@@ -62,13 +59,10 @@ class SegmentationTrainer:
             training_evaluators: Sequence[ScheduledEvaluation],
             validation_evaluators: Sequence[ScheduledEvaluation],
             max_iterations_with_no_improvement: int,
-            enable_patch_mode: bool = False,
-            patch_size: Union[int, Tuple[int, int, int]] = None,
-            training_patch_sampler: PatchSampler = None,
-            training_patches_per_volume: int = None,
-            validation_patch_overlap: Union[int, Tuple[int, int, int]] = None,
-            validation_padding_mode: Union[str, float, None] = None,
-            validation_overlap_mode: str = 'average',
+            train_predictor: SegPredictor,
+            val_predictor: SegPredictor,
+            train_dataloader_factory: DataLoaderFactory, 
+            val_dataloader_factory: DataLoaderFactory,
     ):
         self.training_batch_size = training_batch_size
         self.save_rate = save_rate
@@ -78,13 +72,10 @@ class SegmentationTrainer:
         self.training_evaluators = training_evaluators
         self.validation_evaluators = validation_evaluators
         self.max_iterations_with_no_improvement = max_iterations_with_no_improvement
-        self.enable_patch_mode = enable_patch_mode
-        self.patch_size = patch_size
-        self.training_patch_sampler = training_patch_sampler
-        self.training_patches_per_volume = training_patches_per_volume
-        self.validation_patch_overlap = validation_patch_overlap
-        self.validation_padding_mode = validation_padding_mode
-        self.validation_overlap_mode = validation_overlap_mode
+        self.train_predictor = train_predictor
+        self.val_predictor = val_predictor
+        self.train_dataloader_factory = train_dataloader_factory
+        self.val_dataloader_factory = val_dataloader_factory
 
         self.iteration = 0
         self.max_score = float('-inf')
@@ -111,8 +102,6 @@ class SegmentationTrainer:
             preload_validation_data=False,
             num_workers=0,
             validation_batch_size=16,
-            validation_patch_batch_size=32,
-            patch_queue_length=100,
             logger=NonLogger(),
             **kwargs
     ):
@@ -137,21 +126,9 @@ class SegmentationTrainer:
             print(f"Done. Took {round(time.time() - t, 2)}s")
 
         # Make dataloader for training dataset
-        if not self.enable_patch_mode:
-            training_dataloader = DataLoader(dataset=training_dataset,
+        training_dataloader = self.train_dataloader_factory.getDataLoader(dataset=training_dataset,
                                              batch_size=self.training_batch_size,
-                                             sampler=RandomSampler(training_dataset),
-                                             collate_fn=dont_collate,
                                              num_workers=num_workers)
-        else:
-            queue = tio.Queue(training_dataset,
-                              max_length=patch_queue_length,
-                              samples_per_volume=self.training_patches_per_volume,
-                              sampler=self.training_patch_sampler,
-                              num_workers=num_workers)
-            training_dataloader = DataLoader(dataset=queue,
-                                             batch_size=self.training_batch_size,
-                                             collate_fn=dont_collate)
 
         # Make an iterator for the training dataset
         def get_data_iterator(loader):
@@ -173,11 +150,10 @@ class SegmentationTrainer:
             timer.start()
 
             subjects = next(training_data_iterator)
-            batch = collate_subjects(subjects, image_names=['X', 'y'], device=context.device)
             timer.stamp("data_loading")
 
             context.model.train()
-            subjects = seg_predict(context.model, batch, subjects, label_attributes)
+            subjects, batch = self.train_predictor.predict(context.model, subjects=subjects, label_attributes=label_attributes)
             timer.stamp("model_forward")
 
             loss_dict = context.criterion(batch['y_pred'], batch['y'])
@@ -214,25 +190,17 @@ class SegmentationTrainer:
                 validation_filter = self.get_filter_from_scheduled_evaluations(context.dataset,
                                                                                validation_evaluators)
                 validation_dataset.set_cohort(validation_filter)
-                validation_dataloader = DataLoader(dataset=validation_dataset,
-                                                   batch_size=validation_batch_size,
-                                                   sampler=SequentialSampler(validation_dataset),
-                                                   collate_fn=dont_collate,
-                                                   num_workers=num_workers)
+
+                validation_dataloader = self.val_dataloader_factory.getDataLoader(
+                    dataset=validation_dataset, 
+                    batch_size=validation_batch_size,
+                    num_workers=num_workers
+                )
+
                 validation_subjects = []
                 with torch.no_grad():
                     for subjects in validation_dataloader:
-                        if not self.enable_patch_mode:
-                            batch = collate_subjects(subjects, image_names=['X'], device=context.device)
-                            subjects = seg_predict(context, batch, subjects, y_sample)
-                        else:
-                            subjects = patch_predict(context.model, context.device, subjects,
-                                                     label_attributes=label_attributes,
-                                                     patch_batch_size=validation_patch_batch_size,
-                                                     patch_size=self.patch_size,
-                                                     patch_overlap=self.validation_patch_overlap,
-                                                     padding_mode=self.validation_padding_mode,
-                                                     overlap_mode=self.validation_overlap_mode)
+                        subjects, _ = self.val_predictor.predict(context.model, subjects=subjects, label_attributes=label_attributes)
                         add_evaluation_labels(subjects)
                         validation_subjects += subjects
 
