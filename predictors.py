@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from torchio.typing import TypePatchSize
 
 from transforms import *
-from utils import collate_subjects, dont_collate
+from utils import Config, collate_subjects, dont_collate
 
 
 class SegPredictor(ABC):
@@ -25,7 +25,7 @@ class SegPredictor(ABC):
         batch with with key 'y_pred'"""
 
 
-class StandardPredict(SegPredictor):
+class StandardPredict(SegPredictor, Config):
     """ Creates predictions on whole images"""
 
     def __init__(self, device: torch.device, image_names: Sequence[str]):
@@ -50,6 +50,9 @@ class StandardPredict(SegPredictor):
             out_subjects.append(subject)
 
         return out_subjects, batch
+
+    def getConfig(self) -> Dict[str, Any]:
+        return {}
 
 
 class PatchPredict(SegPredictor):
@@ -102,3 +105,6 @@ class PatchPredict(SegPredictor):
         batch["y_pred"] = torch.stack([subject["y_pred"]["data"] for subject in out_subjects])
 
         return out_subjects, batch
+
+    def getConfig(self) -> Dict[str, Any]:
+        return {'patch_batch_size': self.patch_overlap, 'padding_mode': self.padding_mode, 'overlap_mode': self.overlap_mode}
