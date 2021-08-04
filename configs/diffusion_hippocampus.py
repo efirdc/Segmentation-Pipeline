@@ -145,8 +145,8 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
         score = (cbbrain_dice + ab300_dice) / 2
         return score
 
-    train_predictor = StandardPredict(device, image_names=['X', 'y'])
-    val_predictor = StandardPredict(device, image_names=['X'])
+    train_predictor = StandardPredict(device, sagittal_split=True, image_names=['X', 'y'])
+    val_predictor = StandardPredict(device, sagittal_split=True, image_names=['X'])
 
     train_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)
     val_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)

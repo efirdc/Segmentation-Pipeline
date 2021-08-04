@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from os import X_OK
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import torch
@@ -28,8 +29,9 @@ class SegPredictor(ABC):
 class StandardPredict(SegPredictor, Config):
     """ Creates predictions on whole images"""
 
-    def __init__(self, device: torch.device, image_names: Sequence[str]):
+    def __init__(self, device: torch.device, sagittal_split: bool = False, image_names: Sequence[str] = ["X"]):
         self.device = device
+        self.sagittal_split = sagittal_split
         self.image_names = image_names
 
     def predict(self, model, subjects, label_attributes):
@@ -39,7 +41,17 @@ class StandardPredict(SegPredictor, Config):
         if label_attributes is None:
             label_attributes = {}
 
-        batch["y_pred"] = model(batch["X"])
+        if self.sagittal_split:
+            # apply split and flip on batch to reduce memory
+            split = self.splitAndFlip(batch['X'])
+            out = model(split)
+        else:
+            out = model(batch["X"])
+
+        if self.sagittal_split:
+            out = self.reverseSplitAndFlip(out)
+
+        batch['y_pred'] = out
 
         out_subjects = []
         for i in range(len(subjects)):
@@ -51,8 +63,20 @@ class StandardPredict(SegPredictor, Config):
 
         return out_subjects, batch
 
+    def splitAndFlip(self, x: torch.Tensor) -> torch.Tensor:
+        x_split = list(x.split(x.shape[2] // 2, dim=2))
+        x_split[1] = x_split[1].flip(2)
+        x = torch.cat(x_split, dim=0)
+        return x
+
+    def reverseSplitAndFlip(self, x: torch.Tensor) -> torch.Tensor:
+        x_split = list(x.split(x.shape[0] // 2, dim=0))
+        x_split[1] = x_split[1].flip(2)
+        x = torch.cat(x_split, dim=2)
+        return x
+
     def getConfig(self) -> Dict[str, Any]:
-        return {}
+        return {"sagittal_split": self.sagittal_split}
 
 
 class PatchPredict(SegPredictor):

@@ -45,10 +45,8 @@ class NestedResUNet(nn.Module):
 
             return x
 
-    def __init__(self, input_channels, output_channels, filters, dropout_p=0.0, saggital_split=False):
+    def __init__(self, input_channels, output_channels, filters, dropout_p=0.0):
         super().__init__()
-
-        self.saggital_split = saggital_split
 
         self.dropout = None
         if dropout_p != 0.0:
@@ -76,10 +74,6 @@ class NestedResUNet(nn.Module):
         self.hypothesis = nn.Softmax(dim=1)
 
     def forward(self, x):
-        if self.saggital_split:
-            x = list(x.split(x.shape[2] // 2, dim=2))
-            x[1] = x[1].flip(2)
-            x = torch.cat(x, dim=0)
 
         x0_0 = self.conv0_0(x)
         x1_0 = self.conv1_0(self.down(x0_0))
@@ -96,10 +90,5 @@ class NestedResUNet(nn.Module):
 
         x_out = self.out_conv(x0_3)
         x_out = self.hypothesis(x_out)
-
-        if self.saggital_split:
-            x_out = list(x_out.split(x_out.shape[0] // 2, dim=0))
-            x_out[1] = x_out[1].flip(2)
-            x_out = torch.cat(x_out, dim=2)
 
         return x_out
