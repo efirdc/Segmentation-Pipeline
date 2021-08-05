@@ -223,5 +223,5 @@ class Config(ABC):
     """Representation of a class that has configuration to be stored"""
 
     @abstractmethod
-    def getConfig(self) -> Dict[str, Any]:
-        pass
+    def get_config(self) -> Dict[str, Any]:
+        raise NotImplementedError()
