@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from os import X_OK
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import torch
