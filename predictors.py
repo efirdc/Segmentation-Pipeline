@@ -28,7 +28,7 @@ class SegPredictor(ABC):
 class StandardPredict(SegPredictor, Config):
     """ Creates predictions on whole images"""
 
-    def __init__(self, device: torch.device, sagittal_split: bool = False, image_names: Sequence[str] = ["X"]):
+    def __init__(self, device: torch.device, sagittal_split: bool = False, image_names=("X",)):
         self.device = device
         self.sagittal_split = sagittal_split
         self.image_names = image_names
@@ -89,7 +89,7 @@ class PatchPredict(SegPredictor):
         patch_overlap: TypePatchSize = (0, 0, 0),
         padding_mode: Union[str, float, None] = None,
         overlap_mode: str = "average",
-        image_names: Sequence[str] = ["X"],
+        image_names: Sequence[str] = ("X",),
     ):
         self.device = device
         self.patch_batch_size = patch_batch_size
