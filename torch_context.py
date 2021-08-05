@@ -7,6 +7,7 @@ from typing import Dict, Any
 import torch
 import dill
 
+from utils import Config
 
 class TorchContext:
     """ A simple entity-component system for pytorch experiments.
@@ -216,11 +217,14 @@ class TorchContext:
         for defn in self.component_definitions:
             if component_names and defn['name'] not in component_names:
                 continue
-            out.update({
-                f"{defn['name']}.{param}": value
-                for param, value in defn["params"].items()
-                if any(isinstance(value, t) for t in (str, int, float))
-            })
+            def_dict = dict()
+            for param, value in defn["params"].items():
+                if any(isinstance(value, t) for t in (str, int, float)):
+                    def_dict[f"{defn['name']}.{param}"] = value
+
+                if isinstance(value, Config):
+                    def_dict[f"{defn['name']}.{param}"] = value.getConfig()
+            out.update(def_dict)
 
         return out
 
