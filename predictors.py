@@ -33,7 +33,7 @@ class StandardPredict(SegPredictor, Config):
         self.sagittal_split = sagittal_split
         self.image_names = image_names
 
-    def predict(self, model, subjects, label_attributes):
+    def predict(self, model, subjects, label_attributes=None):
 
         batch = collate_subjects(subjects, image_names=self.image_names, device=self.device)
 
@@ -99,7 +99,7 @@ class PatchPredict(SegPredictor):
         self.overlap_mode = overlap_mode
         self.image_names = image_names
 
-    def predict(self, model, subjects, label_attributes):
+    def predict(self, model, subjects, label_attributes=None):
 
         if label_attributes is None:
             label_attributes = {}
