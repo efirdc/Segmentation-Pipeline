@@ -3,6 +3,7 @@ import os
 import torchio as tio
 from torch.optim import Adam, SGD
 import torch
+from torch.utils.data.sampler import SequentialSampler
 
 from torch_context import TorchContext
 from segmentation_trainer import SegmentationTrainer, ScheduledEvaluation
@@ -11,6 +12,9 @@ from evaluation import HybridLogisticDiceLoss
 from transforms import *
 from data_processing import *
 from evaluators import *
+from predictors import *
+from dataLoaderFactory import *
+from utils import dont_collate
 
 
 def get_context(device, variables, fold=0, **kwargs):
@@ -140,7 +144,21 @@ def get_context(device, variables, fold=0, **kwargs):
 
         return score
 
+    train_predictor = StandardPredict(device, image_names=['X', 'y'])
+    val_predictor = PatchPredict(
+        device=device,
+        patch_batch_size=32,
+        patch_size=config['patch_size'], 
+        patch_overlap=(config['patch_size'] // 8),
+        padding_mode=None,
+        overlap_mode='average',
+        image_names=['X']
+    )
+
     patch_sampler = tio.WeightedSampler(patch_size=config['patch_size'], probability_map='patch_probability')
+    train_dataloader_factory = PatchDataLoader(max_length=100, samples_per_volume=1, sampler=patch_sampler, collate_fn=dont_collate)
+    val_dataloader_factory = StandardDataLoader(sampler=SequentialSampler, collate_fn=dont_collate)
+
     context.add_component("trainer", SegmentationTrainer,
                           training_batch_size=4,
                           save_rate=100,
@@ -150,12 +168,9 @@ def get_context(device, variables, fold=0, **kwargs):
                           training_evaluators=training_evaluators,
                           validation_evaluators=validation_evaluators,
                           max_iterations_with_no_improvement=2000,
-                          enable_patch_mode=True,
-                          patch_size=config['patch_size'],
-                          training_patch_sampler=patch_sampler,
-                          training_patches_per_volume=1,
-                          validation_patch_overlap=(config['patch_size'] // 8),
-                          validation_padding_mode=None,
-                          validation_overlap_mode='average')
+                          train_predictor=train_predictor,
+                          val_predictor=val_predictor,
+                          train_dataloader_factory=train_dataloader_factory,
+                          val_dataloader_factory=val_dataloader_factory)
 
     return context
