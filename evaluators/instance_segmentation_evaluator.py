@@ -98,28 +98,21 @@ class InstanceSegmentationEvaluator(Evaluator):
         self.detection_test_params = {} if detection_test_params is None else detection_test_params
 
     def __call__(self, subjects):
-
         subject_names = [subject['name'] for subject in subjects]
         subject_stats = EvaluationDict(dimensions=['subject', 'stat'],
                                        dimension_keys=[subject_names, self.stats_to_output])
 
         for subject in subjects:
-            pred_data = subject[self.prediction_label_map_name].data
-            target_data = subject[self.target_label_map_name].data
-
-            if pred_data.shape[0] != 2 or target_data.shape[0] != 2:
-                raise RuntimeError("Instance segmentation evaluation is only supported for single class predictions.")
+            pred_data = subject[self.prediction_label_map_name].data > 0
+            target_data = subject[self.target_label_map_name].data > 0
 
             label_params = {'return_num': True, 'connectivity': self.connectivity}
-            pred_components, num_pred_components = label(pred_data[1].numpy(), **label_params)
-            target_components, num_target_components = label(target_data[1].numpy(), **label_params)
+            pred_components, num_pred_components = label(pred_data[0].numpy(), **label_params)
+            target_components, num_target_components = label(target_data[0].numpy(), **label_params)
             N, M = num_target_components, num_pred_components,
 
             pred_components = torch.from_numpy(pred_components)
             target_components = torch.from_numpy(target_components)
-
-            #_, pred_volumes = torch.unique(pred_components, sorted=True, return_counts=True)
-            #_, target_volumes = torch.unique(target_components, sorted=True, return_counts=True)
 
             # Trick to encode the overlap of target components i and predicted components j as (i + j * factor)
             # Then torch.unique can be used to count the occurrences of each overlap

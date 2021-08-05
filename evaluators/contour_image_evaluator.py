@@ -75,12 +75,12 @@ class ContourImageEvaluator(Evaluator):
             return slice_property[plane][-1]
         return slice_property[plane][slice_id]
 
-    def slice_and_make_grid(self, subjects, plane, image_name, channel, impute_shape, pad_value=0):
+    def slice_and_make_grid(self, subjects, plane, image_name, label_value, impute_shape, pad_value=0):
         slices = []
         for subject in subjects:
             slice_id, plane = self.get_slice_id(subject, plane)
             if image_name in subject:
-                slices.append(slice_volume(subject[image_name].data, channel, plane, slice_id).unsqueeze(0))
+                slices.append(slice_volume(subject[image_name].data == label_value, 0, plane, slice_id).unsqueeze(0))
             else:
                 slices.append(torch.zeros(impute_shape))
 
@@ -163,4 +163,5 @@ class ContourImageEvaluator(Evaluator):
         buf.seek(0)
         pil_image = Image.open(buf)
         plt.close(fig)
+
         return pil_image

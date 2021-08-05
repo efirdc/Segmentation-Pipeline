@@ -25,7 +25,8 @@ class SegmentationEvaluator(Evaluator):
     two segmentation models, or two ground truth labels from different experts.
 
     The supported output statistics are the following:
-    ``('TP', 'FP', 'TN', 'FN', 'dice', 'jaccard', 'sensitivity', 'specificity', 'precision', 'recall')``
+    ``('target_volume', 'prediction_volume', 'TP', 'FP', 'TN', 'FN',
+       'dice', 'jaccard', 'precision', 'recall')``
 
     Summary statistics for any of the above can also be computed and output from the evaluation
     The following are supported:
@@ -43,8 +44,8 @@ class SegmentationEvaluator(Evaluator):
             self,
             prediction_label_map_name: str,
             target_label_map_name: str,
-            stats_to_output: Sequence[str] = ('TP', 'FP', 'TN', 'FN', 'dice', 'jaccard', 'sensitivity',
-                                              'specificity', 'precision', 'recall'),
+            stats_to_output: Sequence[str] = ('target_volume', 'prediction_volume',
+                                              'TP', 'FP', 'TN', 'FN', 'dice', 'precision', 'recall'),
             summary_stats_to_output: Sequence[str] = ('mean', 'std', 'min', 'max'),
     ):
         self.prediction_label_map_name = prediction_label_map_name
@@ -61,32 +62,35 @@ class SegmentationEvaluator(Evaluator):
                                        dimension_keys=[subject_names, label_names, self.stats_to_output])
 
         for subject in subjects:
-            pred_data = subject[self.prediction_label_map_name].data.bool()
-            target_data = subject[self.target_label_map_name].data.bool()
-
-            # Compute tensors for each statistic. Each element corresponds to one label.
-            spatial_dims = (1, 2, 3)
-            TP = (target_data & pred_data).sum(dim=spatial_dims)
-            FP = (~target_data & pred_data).sum(dim=spatial_dims)
-            TN = (~target_data & ~pred_data).sum(dim=spatial_dims)
-            FN = (target_data & ~pred_data).sum(dim=spatial_dims)
-
-            stats = {
-                'target_volume': TP + FN,
-                'prediction_volume': TP + FP,
-                'TP': TP,
-                'FP': FP,
-                'TN': TN,
-                'FN': FN,
-                'dice': 2 * TP / (2 * TP + FP + FN),
-                'jaccard': TP / (TP + FP + FN),
-                'precision': TP / (TP + FP),
-                'recall': TP / (TP + FN),
-            }
+            pred_data = subject[self.prediction_label_map_name].data
+            target_data = subject[self.target_label_map_name].data
 
             for label_name, label_value in label_values.items():
+                pred_label = (pred_data == label_value)
+                target_label = (target_data == label_value)
+
+                # Compute tensors for each statistic. Each element corresponds to one label.
+                spatial_dims = (1, 2, 3)
+                TP = (target_label & pred_label).sum(dim=spatial_dims)
+                FP = (~target_label & pred_label).sum(dim=spatial_dims)
+                TN = (~target_label & ~pred_label).sum(dim=spatial_dims)
+                FN = (target_label & ~pred_label).sum(dim=spatial_dims)
+
+                stats = {
+                    'target_volume': TP + FN,
+                    'prediction_volume': TP + FP,
+                    'TP': TP,
+                    'FP': FP,
+                    'TN': TN,
+                    'FN': FN,
+                    'dice': 2 * TP / (2 * TP + FP + FN),
+                    'jaccard': TP / (TP + FP + FN),
+                    'precision': TP / (TP + FP),
+                    'recall': TP / (TP + FN),
+                }
+
                 for stat_name in self.stats_to_output:
-                    value = stats[stat_name][label_value].item()
+                    value = stats[stat_name].item()
                     subject_stats[subject['name'], label_name, stat_name] = value
 
         summary_stats = subject_stats.compute_summary_stats(self.summary_stats_to_output)
