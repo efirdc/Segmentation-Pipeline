@@ -7,7 +7,7 @@ import torchio as tio
 from utils import Config, dont_collate
 
 
-class DataLoaderFactory(ABC):
+class DataLoaderFactory(ABC, Config):
     """Representation to create dataloader object"""
 
     @abstractmethod
@@ -15,7 +15,7 @@ class DataLoaderFactory(ABC):
         """Creates and returns a dataloader"""
 
 
-class StandardDataLoader(DataLoaderFactory, Config):
+class StandardDataLoader(DataLoaderFactory):
     """Create standard dataloader"""
 
     def __init__(self, sampler):
@@ -32,11 +32,8 @@ class StandardDataLoader(DataLoaderFactory, Config):
 
         return dataloader
 
-    def get_config(self):
-        return {}
 
-
-class PatchDataLoader(DataLoaderFactory, Config):
+class PatchDataLoader(DataLoaderFactory):
     """Create patch based dataloader"""
 
     def __init__(self, max_length: int, samples_per_volume, sampler):
@@ -55,6 +52,3 @@ class PatchDataLoader(DataLoaderFactory, Config):
         dataloader = DataLoader(dataset=queue, batch_size=batch_size, collate_fn=dont_collate)
 
         return dataloader
-
-    def get_config(self):
-        return {"max_length": self.max_length, "samples_per_volume": self.samples_per_volume}

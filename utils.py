@@ -6,6 +6,7 @@ import importlib.util
 from pathlib import Path
 from typing import Type, Sequence, Any, Dict
 from abc import ABC, abstractmethod
+from inspect import signature
 
 import torch
 import torchio as tio
@@ -219,9 +220,69 @@ def collate_subjects(subjects: Sequence[tio.Subject], image_names: Sequence[str]
     return batch
 
 
-class Config(ABC):
-    """Representation of a class that has configuration to be stored"""
+def flatten_nested_dict(nested_dict, max_depth=10):
+    """
+    Flattens a nested dictionary. (i.e. a dict whose values are other dicts)
 
-    @abstractmethod
+    The keys of the nested_dict are joined together by a '.'
+    For example if nested_dict['foo']['bar']['baz'] are valid keys for the input nested_dict,
+    then flat_dict['foo.bar.baz'] is a valid key for the output flat_dict
+
+    """
+    flattened_nested_dict = nested_dict.copy()
+    for _ in range(max_depth):
+
+        flat = True
+        for key, value in flattened_nested_dict.copy().items():
+            if isinstance(value, Dict):
+                flat = False
+                del flattened_nested_dict[key]
+                flattened_nested_dict.update({
+                    f"{key}.{nested_key}": nested_value
+                    for nested_key, nested_value in value.items()
+                })
+
+        if flat:
+            break
+
+    return flattened_nested_dict
+
+
+class Config:
+    """
+    Representation of a class that has configuration to be stored.
+
+    The default implementation of get_config requires that all args passed to __init__
+    are stored as classed properties with matching names
+
+    """
+
     def get_config(self) -> Dict[str, Any]:
-        raise NotImplementedError()
+        sig = signature(self.__init__)
+        param_names = list(sig.parameters.keys())
+        for param_name in param_names:
+            if param_name not in self.__dict__:
+                raise RuntimeError(f"All parameters for __init__ must be saved "
+                                   f"as class properties with the same name in order "
+                                   f"to use default get_config(). The parameter {param_name} "
+                                   f"was not saved.")
+        config = {param_name: self.__dict__[param_name] for param_name in param_names}
+        return config
+
+    def get_nested_config(self) -> Dict[str, Any]:
+        config = self.get_config()
+        nested_config = {
+            param_name: arg.get_nested_config() if isinstance(arg, Config) else arg
+            for param_name, arg in config.items()
+        }
+        return nested_config
+
+    def get_flattened_nested_config(self) -> Dict[str, Any]:
+        nested_config = self.get_nested_config()
+        flat_config = flatten_nested_dict(nested_config)
+        return flat_config
+
+    def __str__(self) -> str:
+        config = self.get_config()
+        config_str = ", ".join([f"{param_name}={arg}" for param_name, arg in config.items()])
+        return f"{self.__class__.__name__}({config_str})"
