@@ -156,8 +156,8 @@ def get_context(device, variables, fold=0, **kwargs):
     )
 
     patch_sampler = tio.WeightedSampler(patch_size=config['patch_size'], probability_map='patch_probability')
-    train_dataloader_factory = PatchDataLoader(max_length=100, samples_per_volume=1, sampler=patch_sampler, collate_fn=dont_collate)
-    val_dataloader_factory = StandardDataLoader(sampler=SequentialSampler, collate_fn=dont_collate)
+    train_dataloader_factory = PatchDataLoader(max_length=100, samples_per_volume=1, sampler=patch_sampler)
+    val_dataloader_factory = StandardDataLoader(sampler=SequentialSampler)
 
     context.add_component("trainer", SegmentationTrainer,
                           training_batch_size=4,

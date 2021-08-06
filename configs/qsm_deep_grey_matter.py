@@ -78,8 +78,8 @@ def get_context(device, variables, **kwargs):
     train_predictor = StandardPredict(device, image_names=['X', 'y'])
     val_predictor = StandardPredict(device, image_names=['X'])
 
-    train_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)
-    val_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)
+    train_dataloader_factory = StandardDataLoader(sampler=RandomSampler)
+    val_dataloader_factory = StandardDataLoader(sampler=RandomSampler)
 
     context.add_component("trainer", SegmentationTrainer, save_folder="$CHECKPOINTS_PATH", sample_rate=50, save_rate=250,
                           val_datasets=[

@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import torchio as tio
 
-from utils import Config
+from utils import Config, dont_collate
 
 
 class DataLoaderFactory(ABC):
@@ -18,16 +18,15 @@ class DataLoaderFactory(ABC):
 class StandardDataLoader(DataLoaderFactory, Config):
     """Create standard dataloader"""
 
-    def __init__(self, sampler, collate_fn):
+    def __init__(self, sampler):
         self.sampler = sampler
-        self.collate_fn = collate_fn
 
     def get_data_loader(self, dataset: Dataset, batch_size: int, num_workers: int):
         dataloader = DataLoader(
             dataset=dataset,
             batch_size=batch_size,
             sampler=self.sampler(dataset),
-            collate_fn=self.collate_fn,
+            collate_fn=dont_collate,
             num_workers=num_workers,
         )
 
@@ -40,11 +39,10 @@ class StandardDataLoader(DataLoaderFactory, Config):
 class PatchDataLoader(DataLoaderFactory, Config):
     """Create patch based dataloader"""
 
-    def __init__(self, max_length: int, samples_per_volume, sampler, collate_fn):
+    def __init__(self, max_length: int, samples_per_volume, sampler):
         self.max_length = max_length
         self.samples_per_volume = samples_per_volume
         self.sampler = sampler
-        self.collate_fn = collate_fn
 
     def get_data_loader(self, dataset: tio.SubjectsDataset, batch_size: int, num_workers: int):
         queue = tio.Queue(
@@ -54,7 +52,7 @@ class PatchDataLoader(DataLoaderFactory, Config):
             sampler=self.sampler,
             num_workers=num_workers,
         )
-        dataloader = DataLoader(dataset=queue, batch_size=batch_size, collate_fn=self.collate_fn)
+        dataloader = DataLoader(dataset=queue, batch_size=batch_size, collate_fn=dont_collate)
 
         return dataloader
 

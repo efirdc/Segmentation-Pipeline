@@ -148,8 +148,8 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
     train_predictor = StandardPredict(device, sagittal_split=True, image_names=['X', 'y'])
     val_predictor = StandardPredict(device, sagittal_split=True, image_names=['X'])
 
-    train_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)
-    val_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)
+    train_dataloader_factory = StandardDataLoader(sampler=RandomSampler)
+    val_dataloader_factory = StandardDataLoader(sampler=RandomSampler)
 
     context.add_component("trainer", SegmentationTrainer,
                           training_batch_size=2,
