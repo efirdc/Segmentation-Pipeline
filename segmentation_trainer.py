@@ -12,7 +12,7 @@ from data_processing import *
 from loggers import *
 from transforms import *
 from utils import Timer
-from dataLoaderFactory import DataLoaderFactory
+from data_loader_factory import DataLoaderFactory
 from predictors import SegPredictor
 from segmentation import add_evaluation_labels
 

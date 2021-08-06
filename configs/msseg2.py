@@ -13,7 +13,7 @@ from transforms import *
 from data_processing import *
 from evaluators import *
 from predictors import *
-from dataLoaderFactory import *
+from data_loader_factory import *
 from utils import dont_collate
 
 

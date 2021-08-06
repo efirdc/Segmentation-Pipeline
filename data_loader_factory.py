@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any
 
-import torchio as tio
+from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
+import torchio as tio
 
-from data_processing.subject_folder import SubjectFolder
 from utils import Config
 
 
@@ -12,7 +11,7 @@ class DataLoaderFactory(ABC):
     """Representation to create dataloader object"""
 
     @abstractmethod
-    def getDataLoader(self, dataset: SubjectFolder, batch_size: int, num_workers: int) -> DataLoader:
+    def get_data_loader(self, dataset: Dataset, batch_size: int, num_workers: int) -> DataLoader:
         """Creates and returns a dataloader"""
 
 
@@ -23,7 +22,7 @@ class StandardDataLoader(DataLoaderFactory, Config):
         self.sampler = sampler
         self.collate_fn = collate_fn
 
-    def getDataLoader(self, dataset: SubjectFolder, batch_size: int, num_workers: int):
+    def get_data_loader(self, dataset: Dataset, batch_size: int, num_workers: int):
         dataloader = DataLoader(
             dataset=dataset,
             batch_size=batch_size,
@@ -34,7 +33,7 @@ class StandardDataLoader(DataLoaderFactory, Config):
 
         return dataloader
 
-    def getConfig(self):
+    def get_config(self):
         return {}
 
 
@@ -47,7 +46,7 @@ class PatchDataLoader(DataLoaderFactory, Config):
         self.sampler = sampler
         self.collate_fn = collate_fn
 
-    def getDataLoader(self, dataset: SubjectFolder, batch_size: int, num_workers: int):
+    def get_data_loader(self, dataset: tio.SubjectsDataset, batch_size: int, num_workers: int):
         queue = tio.Queue(
             dataset,
             max_length=self.max_length,
@@ -59,5 +58,5 @@ class PatchDataLoader(DataLoaderFactory, Config):
 
         return dataloader
 
-    def getConfig(self):
+    def get_config(self):
         return {"max_length": self.max_length, "samples_per_volume": self.samples_per_volume}

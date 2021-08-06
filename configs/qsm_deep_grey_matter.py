@@ -9,7 +9,7 @@ from torch.optim import Adam
 
 from transforms import *
 from predictors import *
-from dataLoaderFactory import *
+from data_loader_factory import *
 
 
 def get_context(device, variables, **kwargs):
