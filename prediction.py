@@ -6,13 +6,14 @@ import torchio as tio
 from torch import nn
 from torch.utils.data import DataLoader
 from torchio.typing import TypePatchSize
+from torchio.transforms.preprocessing.label.label_transform import LabelTransform
 
 from transforms import *
-from utils import Config, collate_subjects, dont_collate
+from utils import Config, collate_subjects, dont_collate, filter_transform
 
 
-class SegPredictor(ABC, Config):
-    """Representation to predict segmentations"""
+class Predictor(ABC, Config):
+    """Representation to get model predictions"""
 
     @abstractmethod
     def predict(
@@ -26,16 +27,16 @@ class SegPredictor(ABC, Config):
         batch with with key 'y_pred'"""
 
 
-class StandardPredict(SegPredictor):
+class StandardPredict(Predictor):
     """ Creates predictions on whole images"""
 
     def __init__(
             self,
-            sagittal_split: bool = False,
             image_names: Sequence[str] = ("X",),
+            sagittal_split: bool = False,
     ):
-        self.sagittal_split = sagittal_split
         self.image_names = image_names
+        self.sagittal_split = sagittal_split
 
     def predict(self, model, device, subjects, label_attributes=None):
 
@@ -77,24 +78,24 @@ class StandardPredict(SegPredictor):
         return x
 
 
-class PatchPredict(SegPredictor):
+class PatchPredict(Predictor):
     """ Creates predictions on patches and aggregates"""
 
     def __init__(
         self,
+        image_names: Sequence[str] = ("X",),
         patch_batch_size: int = 16,
         patch_size: TypePatchSize = None,
         patch_overlap: TypePatchSize = (0, 0, 0),
         padding_mode: Union[str, float, None] = None,
         overlap_mode: str = "average",
-        image_names: Sequence[str] = ("X",),
     ):
+        self.image_names = image_names
         self.patch_batch_size = patch_batch_size
         self.patch_size = patch_size
         self.patch_overlap = patch_overlap
         self.padding_mode = padding_mode
         self.overlap_mode = overlap_mode
-        self.image_names = image_names
 
     def predict(self, model, device, subjects, label_attributes=None):
 
@@ -125,3 +126,19 @@ class PatchPredict(SegPredictor):
         batch["y_pred"] = torch.stack([subject["y_pred"]["data"] for subject in out_subjects])
 
         return out_subjects, batch
+
+
+def add_evaluation_labels(subjects: Sequence[tio.Subject]):
+    for subject in subjects:
+        transform = subject.get_composed_history()
+        label_transform_types = [LabelTransform, CopyProperty, RenameProperty, ConcatenateImages]
+        label_transform = filter_transform(transform, include_types=label_transform_types)
+        evaluation_transform = label_transform.inverse(warn=False)
+
+        if 'y_pred' in subject:
+            pred_subject = tio.Subject({'y': subject['y_pred']})
+            subject['y_pred_eval'] = evaluation_transform(pred_subject)['y']
+
+        if 'y' in subject:
+            target_subject = tio.Subject({'y': subject['y']})
+            subject['y_eval'] = evaluation_transform(target_subject)['y']

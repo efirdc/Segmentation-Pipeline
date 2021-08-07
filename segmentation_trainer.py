@@ -2,7 +2,7 @@ import time
 import os
 import signal
 import threading
-from typing import Sequence, Callable, Union, Tuple
+from typing import Sequence, Callable
 
 import torch
 import torchio as tio
@@ -10,11 +10,9 @@ import torchio as tio
 from evaluators import *
 from data_processing import *
 from loggers import *
-from transforms import *
 from utils import Timer
 from data_loader_factory import DataLoaderFactory
-from predictors import SegPredictor
-from segmentation import add_evaluation_labels
+from prediction import Predictor, add_evaluation_labels
 
 EXIT = threading.Event()
 EXIT.clear()
@@ -59,8 +57,8 @@ class SegmentationTrainer:
             training_evaluators: Sequence[ScheduledEvaluation],
             validation_evaluators: Sequence[ScheduledEvaluation],
             max_iterations_with_no_improvement: int,
-            train_predictor: SegPredictor,
-            validation_predictor: SegPredictor,
+            train_predictor: Predictor,
+            validation_predictor: Predictor,
             train_dataloader_factory: DataLoaderFactory,
             validation_dataloader_factory: DataLoaderFactory,
     ):
@@ -191,9 +189,10 @@ class SegmentationTrainer:
                 validation_filter = self.get_filter_from_scheduled_evaluations(context.dataset,
                                                                                validation_evaluators)
                 validation_dataset.set_cohort(validation_filter)
-                validation_dataloader = self.val_dataloader_factory.get_data_loader(dataset=validation_dataset,
-                                                                                    batch_size=validation_batch_size,
-                                                                                    num_workers=num_workers)
+                validation_dataloader = self.validation_dataloader_factory.get_data_loader(
+                                                        dataset=validation_dataset,
+                                                        batch_size=validation_batch_size,
+                                                        num_workers=num_workers)
                 validation_subjects = []
                 with torch.no_grad():
                     for subjects in validation_dataloader:

@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, RandomSampler
 from torch.optim import Adam
 
 from transforms import *
-from predictors import *
+from prediction import *
 from data_loader_factory import *
 
 

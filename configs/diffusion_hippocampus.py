@@ -12,7 +12,7 @@ from torch.optim import Adam
 from transforms import *
 from data_processing import *
 from evaluators import *
-from predictors import *
+from prediction import *
 from data_loader_factory import *
 
 

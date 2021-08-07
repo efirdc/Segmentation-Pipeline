@@ -34,9 +34,11 @@ def as_set(x):
     return {x}
 
 
-# Apply this to variable *args so that they can also be optionally given as a sequence
-# i.e. some_func(1, 2, 3) can be the same as some_func([1, 2, 3]) if fix_vargs is applied
 def vargs_or_sequence(args):
+    """
+    Apply this to variable *args so that they can also be optionally given as a sequence
+    i.e. some_func(1, 2, 3) can be the same as some_func([1, 2, 3]) if this is applied
+    """
     if is_sequence(args) and len(args) == 1 and is_sequence(args[0]):
         return args[0]
     return args
