@@ -17,7 +17,7 @@ COPY docker-requirements.txt /Segmentation-Pipeline
 
 RUN pip install --upgrade pip && pip install -r docker-requirements.txt
 
-COPY . .
+COPY .. .
 
 RUN mkdir -p /Segmentation-Pipeline/data/input/raw_data
 RUN mkdir -p /Segmentation-Pipeline/data/input/preprocessed
