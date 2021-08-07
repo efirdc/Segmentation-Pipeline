@@ -7,6 +7,7 @@ from random_words import RandomWords
 import pandas as pd
 from PIL import Image
 
+from utils import flatten_nested_dict
 from .logger import Logger
 
 
@@ -55,7 +56,7 @@ class WandbLogger(Logger):
             rw = RandomWords()
             context.name = f'{context.name}-{rw.random_word()}-{rw.random_word()}-{context.metadata["wandb_id"]}'
             wandb_params['name'] = context.name
-            wandb_params['config'] = context.get_config()
+            wandb_params['config'] = flatten_nested_dict(context.get_config())
         else:
             wandb_params['id'] = context.metadata["wandb_id"]
             wandb_params['resume'] = 'allow'
