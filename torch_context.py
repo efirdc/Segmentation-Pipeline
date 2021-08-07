@@ -3,11 +3,13 @@ import os
 from datetime import datetime
 from pprint import pformat
 from typing import Dict, Any
+from numbers import Number
 
 import torch
 import dill
 
 from utils import Config
+
 
 class TorchContext:
     """ A simple entity-component system for pytorch experiments.
@@ -212,21 +214,22 @@ class TorchContext:
             raise NotImplementedError("Modifying components after they are initialized is not supported.")
 
     def get_config(self, component_names=None):
-        out = self.config.copy()
+        config = self.config.copy()
 
         for defn in self.component_definitions:
+
             if component_names and defn['name'] not in component_names:
                 continue
-            def_dict = dict()
+
             for param, value in defn["params"].items():
-                if any(isinstance(value, t) for t in (str, int, float)):
-                    def_dict[f"{defn['name']}.{param}"] = value
+                if isinstance(value, Number) or isinstance(value, str):
+                    config[f"{defn['name']}.{param}"] = value
+                elif isinstance(value, Config):
+                    config[f"{defn['name']}.{param}"] = value.get_nested_config()
+                else:
+                    config[f"{defn['name']}.{param}"] = str(value)
 
-                if isinstance(value, Config):
-                    def_dict[f"{defn['name']}.{param}"] = value.getConfig()
-            out.update(def_dict)
-
-        return out
+        return config
 
     def __repr__(self):
         out = f'TorchContext {self.name} created at {self.creation_time}\n'

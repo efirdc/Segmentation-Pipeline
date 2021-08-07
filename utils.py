@@ -5,7 +5,7 @@ import json
 import importlib.util
 from pathlib import Path
 from typing import Type, Sequence, Any, Dict
-from abc import ABC, abstractmethod
+from numbers import Number
 from inspect import signature
 
 import torch
@@ -270,17 +270,20 @@ class Config:
         return config
 
     def get_nested_config(self) -> Dict[str, Any]:
-        config = self.get_config()
-        nested_config = {
-            param_name: arg.get_nested_config() if isinstance(arg, Config) else arg
-            for param_name, arg in config.items()
-        }
-        return nested_config
+        return Config._get_nested_config(self)
 
-    def get_flattened_nested_config(self) -> Dict[str, Any]:
-        nested_config = self.get_nested_config()
-        flat_config = flatten_nested_dict(nested_config)
-        return flat_config
+    @staticmethod
+    def _get_nested_config(elem):
+        if isinstance(elem, Dict):
+            return {k: Config._get_nested_config(v) for k, v in elem.items()}
+        if is_sequence(elem):
+            return [Config._get_nested_config(v) for v in elem]
+        if isinstance(elem, Config):
+            return Config._get_nested_config(elem.get_config())
+        if isinstance(elem, Number) or isinstance(elem, str):
+            return elem
+        else:
+            return str(elem)
 
     def __str__(self) -> str:
         config = self.get_config()
