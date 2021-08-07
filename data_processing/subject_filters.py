@@ -4,10 +4,10 @@ from typing import Sequence, Dict, Union, Any
 import numpy as np
 import torchio as tio
 
-from utils import as_set, is_sequence, vargs_or_sequence, as_list
+from utils import as_set, is_sequence, vargs_or_sequence, as_list, Config
 
 
-class SubjectFilter:
+class SubjectFilter(Config):
     """ Base class for filtering subjects
 
     Implementations which depend only the attributes of a single subject
