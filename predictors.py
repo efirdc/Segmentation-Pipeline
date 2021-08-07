@@ -11,7 +11,7 @@ from transforms import *
 from utils import Config, collate_subjects, dont_collate
 
 
-class SegPredictor(ABC):
+class SegPredictor(ABC, Config):
     """Representation to predict segmentations"""
 
     @abstractmethod
@@ -25,7 +25,7 @@ class SegPredictor(ABC):
         batch with with key 'y_pred'"""
 
 
-class StandardPredict(SegPredictor, Config):
+class StandardPredict(SegPredictor):
     """ Creates predictions on whole images"""
 
     def __init__(self, device: torch.device, sagittal_split: bool = False, image_names=("X",)):
@@ -71,9 +71,6 @@ class StandardPredict(SegPredictor, Config):
         x_split[1] = x_split[1].flip(2)
         x = torch.cat(x_split, dim=2)
         return x
-
-    def get_config(self) -> Dict[str, Any]:
-        return {"sagittal_split": self.sagittal_split}
 
 
 class PatchPredict(SegPredictor):
@@ -126,6 +123,3 @@ class PatchPredict(SegPredictor):
         batch["y_pred"] = torch.stack([subject["y_pred"]["data"] for subject in out_subjects])
 
         return out_subjects, batch
-
-    def get_config(self) -> Dict[str, Any]:
-        return {'patch_batch_size': self.patch_overlap, 'padding_mode': self.padding_mode, 'overlap_mode': self.overlap_mode}
