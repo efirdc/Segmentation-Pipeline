@@ -60,9 +60,9 @@ class SegmentationTrainer:
             validation_evaluators: Sequence[ScheduledEvaluation],
             max_iterations_with_no_improvement: int,
             train_predictor: SegPredictor,
-            val_predictor: SegPredictor,
-            train_dataloader_factory: DataLoaderFactory, 
-            val_dataloader_factory: DataLoaderFactory,
+            validation_predictor: SegPredictor,
+            train_dataloader_factory: DataLoaderFactory,
+            validation_dataloader_factory: DataLoaderFactory,
     ):
         self.training_batch_size = training_batch_size
         self.save_rate = save_rate
@@ -73,9 +73,9 @@ class SegmentationTrainer:
         self.validation_evaluators = validation_evaluators
         self.max_iterations_with_no_improvement = max_iterations_with_no_improvement
         self.train_predictor = train_predictor
-        self.val_predictor = val_predictor
+        self.validation_predictor = validation_predictor
         self.train_dataloader_factory = train_dataloader_factory
-        self.val_dataloader_factory = val_dataloader_factory
+        self.validation_dataloader_factory = validation_dataloader_factory
 
         self.iteration = 0
         self.max_score = float('-inf')
@@ -126,9 +126,9 @@ class SegmentationTrainer:
             print(f"Done. Took {round(time.time() - t, 2)}s")
 
         # Make dataloader for training dataset
-        training_dataloader = self.train_dataloader_factory.getDataLoader(dataset=training_dataset,
-                                             batch_size=self.training_batch_size,
-                                             num_workers=num_workers)
+        training_dataloader = self.train_dataloader_factory.get_data_loader(dataset=training_dataset,
+                                                                            batch_size=self.training_batch_size,
+                                                                            num_workers=num_workers)
 
         # Make an iterator for the training dataset
         def get_data_iterator(loader):
@@ -153,7 +153,8 @@ class SegmentationTrainer:
             timer.stamp("data_loading")
 
             context.model.train()
-            subjects, batch = self.train_predictor.predict(context.model, subjects=subjects, label_attributes=label_attributes)
+            subjects, batch = self.train_predictor.predict(context.model, context.device, subjects=subjects,
+                                                           label_attributes=label_attributes)
             timer.stamp("model_forward")
 
             loss_dict = context.criterion(batch['y_pred'], batch['y'])
@@ -190,17 +191,15 @@ class SegmentationTrainer:
                 validation_filter = self.get_filter_from_scheduled_evaluations(context.dataset,
                                                                                validation_evaluators)
                 validation_dataset.set_cohort(validation_filter)
-
-                validation_dataloader = self.val_dataloader_factory.getDataLoader(
-                    dataset=validation_dataset, 
-                    batch_size=validation_batch_size,
-                    num_workers=num_workers
-                )
-
+                validation_dataloader = self.val_dataloader_factory.get_data_loader(dataset=validation_dataset,
+                                                                                    batch_size=validation_batch_size,
+                                                                                    num_workers=num_workers)
                 validation_subjects = []
                 with torch.no_grad():
                     for subjects in validation_dataloader:
-                        subjects, _ = self.val_predictor.predict(context.model, subjects=subjects, label_attributes=label_attributes)
+                        subjects, _ = self.validation_predictor.predict(context.model, context.device,
+                                                                        subjects=subjects,
+                                                                        label_attributes=label_attributes)
                         add_evaluation_labels(subjects)
                         validation_subjects += subjects
 

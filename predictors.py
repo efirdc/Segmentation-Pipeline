@@ -18,6 +18,7 @@ class SegPredictor(ABC, Config):
     def predict(
         self,
         model: nn.Module,
+        device: torch.device,
         subjects: Sequence[tio.Subject],
         label_attributes: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Sequence[tio.Subject], Dict[str, torch.Tensor]]:
@@ -28,14 +29,17 @@ class SegPredictor(ABC, Config):
 class StandardPredict(SegPredictor):
     """ Creates predictions on whole images"""
 
-    def __init__(self, device: torch.device, sagittal_split: bool = False, image_names=("X",)):
-        self.device = device
+    def __init__(
+            self,
+            sagittal_split: bool = False,
+            image_names: Sequence[str] = ("X",),
+    ):
         self.sagittal_split = sagittal_split
         self.image_names = image_names
 
-    def predict(self, model, subjects, label_attributes=None):
+    def predict(self, model, device, subjects, label_attributes=None):
 
-        batch = collate_subjects(subjects, image_names=self.image_names, device=self.device)
+        batch = collate_subjects(subjects, image_names=self.image_names, device=device)
 
         if label_attributes is None:
             label_attributes = {}
@@ -78,7 +82,6 @@ class PatchPredict(SegPredictor):
 
     def __init__(
         self,
-        device: torch.device,
         patch_batch_size: int = 16,
         patch_size: TypePatchSize = None,
         patch_overlap: TypePatchSize = (0, 0, 0),
@@ -86,7 +89,6 @@ class PatchPredict(SegPredictor):
         overlap_mode: str = "average",
         image_names: Sequence[str] = ("X",),
     ):
-        self.device = device
         self.patch_batch_size = patch_batch_size
         self.patch_size = patch_size
         self.patch_overlap = patch_overlap
@@ -94,7 +96,7 @@ class PatchPredict(SegPredictor):
         self.overlap_mode = overlap_mode
         self.image_names = image_names
 
-    def predict(self, model, subjects, label_attributes=None):
+    def predict(self, model, device, subjects, label_attributes=None):
 
         if label_attributes is None:
             label_attributes = {}
@@ -108,7 +110,7 @@ class PatchPredict(SegPredictor):
 
             for subject_patches in patch_loader:
                 locations = torch.stack([patch["location"] for patch in subject_patches])
-                patch_batch = collate_subjects(subject_patches, self.image_names, device=self.device)
+                patch_batch = collate_subjects(subject_patches, self.image_names, device=device)
                 with torch.no_grad():
                     y_pred_patch = model(patch_batch["X"])
                 aggregator.add_batch(y_pred_patch, locations)
@@ -119,7 +121,7 @@ class PatchPredict(SegPredictor):
             subject = EnforceConsistentAffine(source_image_name="X")(subject)
             out_subjects.append(subject)
 
-        batch = collate_subjects(subjects, image_names=self.image_names, device=self.device)
+        batch = collate_subjects(subjects, image_names=self.image_names, device=device)
         batch["y_pred"] = torch.stack([subject["y_pred"]["data"] for subject in out_subjects])
 
         return out_subjects, batch

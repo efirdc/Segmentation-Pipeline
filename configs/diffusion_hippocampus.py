@@ -1,6 +1,6 @@
 import os
 
-from torch.utils.data.sampler import RandomSampler
+from torch.utils.data.sampler import RandomSampler, SequentialSampler
 
 from torch_context import TorchContext
 import torchio as tio
@@ -145,11 +145,11 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
         score = (cbbrain_dice + ab300_dice) / 2
         return score
 
-    train_predictor = StandardPredict(device, sagittal_split=True, image_names=['X', 'y'])
-    val_predictor = StandardPredict(device, sagittal_split=True, image_names=['X'])
+    train_predictor = StandardPredict(sagittal_split=True, image_names=['X', 'y'])
+    validation_predictor = StandardPredict(sagittal_split=True, image_names=['X'])
 
     train_dataloader_factory = StandardDataLoader(sampler=RandomSampler)
-    val_dataloader_factory = StandardDataLoader(sampler=RandomSampler)
+    validation_dataloader_factory = StandardDataLoader(sampler=SequentialSampler)
 
     context.add_component("trainer", SegmentationTrainer,
                           training_batch_size=2,
@@ -161,8 +161,8 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
                           validation_evaluators=validation_evaluators,
                           max_iterations_with_no_improvement=500,                           
                           train_predictor=train_predictor,
-                          val_predictor=val_predictor,
+                          validation_predictor=validation_predictor,
                           train_dataloader_factory=train_dataloader_factory,
-                          val_dataloader_factory=val_dataloader_factory)
+                          validation_dataloader_factory=validation_dataloader_factory)
 
     return context
