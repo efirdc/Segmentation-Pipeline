@@ -1,5 +1,4 @@
 from skimage.morphology import label, remove_small_holes, dilation
-import torch
 import numpy as np
 
 
@@ -72,19 +71,3 @@ def remove_small_components(img, component_size, max_dilations=100):
     holes_removed, counts = remove_holes(inverted_img, component_size, max_dilations=max_dilations)
     img[holes_removed] = 0
     return img, counts
-
-
-def lateral_uniformity(seg, prob, return_counts=False):
-    seg = seg.clone()
-    prob_non_background = prob[1:]
-    lateral_probability_sum = prob_non_background.sum(dim=1, keepdim=True)
-    lateral_seg = torch.argmax(lateral_probability_sum, dim=0).repeat(seg.shape[0], 1, 1) + 1
-    seg_mask = seg > 0
-    count = 0
-    if return_counts:
-        count = (seg[seg_mask] != lateral_seg[seg_mask]).sum()
-    seg[seg_mask] = lateral_seg[seg_mask]
-
-    if return_counts:
-        return seg, count
-    return seg
