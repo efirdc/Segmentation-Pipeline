@@ -3,9 +3,9 @@ from typing import Union, Sequence, Dict, Optional
 import torch
 from torch import nn
 
-from utils import is_sequence
 from .components import Block3d
-from .model_utils import filter_kwargs
+from .utils import filter_kwargs
+from ..utils import is_sequence
 
 
 class ModularUNet(nn.Module):

@@ -7,12 +7,12 @@ from typing import Sequence, Callable
 import torch
 import torchio as tio
 
-from evaluators import *
-from data_processing import *
-from loggers import *
-from utils import Timer
-from data_loader_factory import DataLoaderFactory
-from prediction import Predictor, add_evaluation_labels
+from .evaluators import *
+from .data_processing import *
+from .loggers import *
+from .utils import TorchTimer, auto_str
+from .data_loader_factory import DataLoaderFactory
+from .prediction import Predictor, add_evaluation_labels
 
 EXIT = threading.Event()
 EXIT.clear()
@@ -44,6 +44,9 @@ class ScheduledEvaluation:
         self.cohorts = cohorts
         self.subjects = subjects
         self.interval = interval
+
+    def __repr__(self):
+        return auto_str(self)
 
 
 class SegmentationTrainer:
@@ -143,7 +146,7 @@ class SegmentationTrainer:
                             if k not in default_label}
 
         # Training loop
-        timer = Timer(context.device)
+        timer = TorchTimer(context.device)
         for _ in range(iterations):
             timer.start()
 

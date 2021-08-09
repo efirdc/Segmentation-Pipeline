@@ -1,3 +1,4 @@
+import copy
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
@@ -8,8 +9,8 @@ from torch.utils.data import DataLoader
 from torchio.typing import TypePatchSize
 from torchio.transforms.preprocessing.label.label_transform import LabelTransform
 
-from transforms import *
-from utils import Config, collate_subjects, dont_collate, filter_transform
+from .transforms import *
+from .utils import Config, collate_subjects, no_op
 
 
 class Predictor(ABC, Config):
@@ -25,6 +26,7 @@ class Predictor(ABC, Config):
     ) -> Tuple[Sequence[tio.Subject], Dict[str, torch.Tensor]]:
         """Creates predictions for subjects and adds the predictions as an image with name 'y_pred' and
         batch with with key 'y_pred'"""
+        raise NotImplementedError()
 
 
 class StandardPredict(Predictor):
@@ -58,7 +60,7 @@ class StandardPredict(Predictor):
         out_subjects = []
         for i in range(len(subjects)):
             subject = subjects[i]
-            y_pred = tio.LabelMap(tensor=batch["y_pred"][i].detach().cpu(), **label_attributes)
+            y_pred = tio.LabelMap(tensor=batch["y_pred"][i].detach().cpu(), **copy.deepcopy(label_attributes))
             subject.add_image(y_pred, "y_pred")
             subject = EnforceConsistentAffine(source_image_name="X")(subject)
             out_subjects.append(subject)
@@ -106,7 +108,7 @@ class PatchPredict(Predictor):
         batch = {}
         for subject in subjects:
             grid_sampler = tio.GridSampler(subject, self.patch_size, self.patch_overlap, self.padding_mode)
-            patch_loader = DataLoader(grid_sampler, batch_size=self.patch_batch_size, collate_fn=dont_collate)
+            patch_loader = DataLoader(grid_sampler, batch_size=self.patch_batch_size, collate_fn=no_op)
             aggregator = tio.GridAggregator(grid_sampler, overlap_mode=self.overlap_mode)
 
             for subject_patches in patch_loader:
@@ -117,7 +119,7 @@ class PatchPredict(Predictor):
                 aggregator.add_batch(y_pred_patch, locations)
 
             aggregated_patch = aggregator.get_output_tensor().cpu()
-            y_pred = tio.LabelMap(tensor=aggregated_patch, **label_attributes)
+            y_pred = tio.LabelMap(tensor=aggregated_patch, **copy.deepcopy(label_attributes))
             subject.add_image(y_pred, "y_pred")
             subject = EnforceConsistentAffine(source_image_name="X")(subject)
             out_subjects.append(subject)

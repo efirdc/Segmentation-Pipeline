@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import torchio as tio
 
-from utils import Config, dont_collate
+from .utils import Config, no_op
 
 
 class DataLoaderFactory(ABC, Config):
@@ -26,7 +26,7 @@ class StandardDataLoader(DataLoaderFactory):
             dataset=dataset,
             batch_size=batch_size,
             sampler=self.sampler(dataset),
-            collate_fn=dont_collate,
+            collate_fn=no_op,
             num_workers=num_workers,
         )
 
@@ -49,6 +49,6 @@ class PatchDataLoader(DataLoaderFactory):
             sampler=self.sampler,
             num_workers=num_workers,
         )
-        dataloader = DataLoader(dataset=queue, batch_size=batch_size, collate_fn=dont_collate)
+        dataloader = DataLoader(dataset=queue, batch_size=batch_size, collate_fn=no_op)
 
         return dataloader

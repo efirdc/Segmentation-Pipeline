@@ -1,13 +1,12 @@
 from random import Random
 from typing import Sequence, Dict, Union, Any
 
-import numpy as np
 import torchio as tio
 
-from utils import as_set, is_sequence, vargs_or_sequence, as_list, Config
+from ..utils import as_set, is_sequence, vargs_or_sequence, as_list, auto_str
 
 
-class SubjectFilter(Config):
+class SubjectFilter:
     """ Base class for filtering subjects
 
     Implementations which depend only the attributes of a single subject
@@ -44,6 +43,9 @@ class SubjectFilter(Config):
 
     def __invert__(self):
         return NegateFilter(self)
+
+    def __repr__(self):
+        return auto_str(self)
 
 
 class RequireAttributes(SubjectFilter):

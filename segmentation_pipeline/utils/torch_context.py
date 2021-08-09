@@ -3,12 +3,11 @@ import os
 from datetime import datetime
 from pprint import pformat
 from typing import Dict, Any
-from numbers import Number
 
 import torch
 import dill
 
-from utils import Config
+from .config import get_nested_config
 
 
 class TorchContext:

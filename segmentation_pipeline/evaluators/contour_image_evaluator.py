@@ -9,8 +9,6 @@ from matplotlib.cm import get_cmap
 from PIL import Image
 from torchvision.utils import make_grid
 
-from transforms import FindInterestingSlice
-from utils import slice_volume
 from .evaluator import Evaluator
 
 

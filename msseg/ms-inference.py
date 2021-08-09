@@ -4,9 +4,9 @@ from pathlib import Path
 import torchio as tio
 import torch
 
-from models import EnsembleModels, EnsembleFlips, EnsembleOrientations
-from post_processing import remove_holes, remove_small_components
-from torch_context import TorchContext
+from segmentation_pipeline import EnsembleModels, EnsembleFlips, EnsembleOrientations
+from segmentation_pipeline.post_processing import remove_holes, remove_small_components
+from segmentation_pipeline.utils.utils import TorchContext
 from segmentation import patch_predict
 
 

@@ -1,19 +1,9 @@
 import os
 
-import torchio as tio
-from torch.optim import Adam, SGD
-import torch
+from torch.optim import SGD
 from torch.utils.data.sampler import SequentialSampler
 
-from torch_context import TorchContext
-from segmentation_trainer import SegmentationTrainer, ScheduledEvaluation
-from models import *
-from evaluation import HybridLogisticDiceLoss
-from transforms import *
-from data_processing import *
-from evaluators import *
-from prediction import *
-from data_loader_factory import *
+from segmentation_pipeline import *
 
 
 def get_context(device, variables, fold=0, **kwargs):

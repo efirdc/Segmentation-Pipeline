@@ -1,19 +1,10 @@
 import os
 
-from torch.utils.data.sampler import RandomSampler, SequentialSampler
-
-from torch_context import TorchContext
-import torchio as tio
-from segmentation_trainer import SegmentationTrainer, ScheduledEvaluation
-from models import NestedResUNet
-from evaluation import HybridLogisticDiceLoss
 from torch.optim import Adam
+from torch.utils.data.sampler import RandomSampler, SequentialSampler
+import torchio as tio
 
-from transforms import *
-from data_processing import *
-from evaluators import *
-from prediction import *
-from data_loader_factory import *
+from segmentation_pipeline import *
 
 
 def get_context(device, variables, predict_hbt=False, **kwargs):
@@ -82,7 +73,7 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
     context.add_component("dataset", SubjectFolder, root='$DATASET_PATH', subject_path="subjects",
                           subject_loader=subject_loader, cohorts=cohorts, transforms=transforms)
     context.add_component("model", NestedResUNet, input_channels=3, output_channels=4 if predict_hbt else 2,
-                          filters=40, dropout_p=0.2, saggital_split=True)
+                          filters=40, dropout_p=0.2)
     context.add_component("optimizer", Adam, params="self.model.parameters()", lr=0.0002)
     context.add_component("criterion", HybridLogisticDiceLoss)
 

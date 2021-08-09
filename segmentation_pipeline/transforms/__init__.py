@@ -1,6 +1,12 @@
 from .concatenate_images import ConcatenateImages
-from .custom_label_transforms import CustomRemapLabels, CustomSequentialLabels, CustomRemoveLabels, CustomOneHot, \
-    CustomArgMax, MergeLabels
+from .custom_label_transforms import (
+    CustomRemapLabels,
+    CustomSequentialLabels,
+    CustomRemoveLabels,
+    CustomOneHot,
+    CustomArgMax,
+    MergeLabels
+)
 from .copy_image import CopyProperty
 from .rename_image import RenameProperty
 from .split_image import SplitImage
@@ -12,3 +18,4 @@ from .target_resample import TargetResample
 from .enforce_consistent_affine import EnforceConsistentAffine
 from .min_size_pad import MinSizePad
 from .permute_dimensions import PermuteDimensions, RandomPermuteDimensions
+from .utils import filter_transform

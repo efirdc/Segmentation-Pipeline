@@ -1,17 +1,14 @@
 import argparse
 import itertools
-import os
 from pathlib import Path
 
-import torch
 import torchio as tio
 from torch.utils.data import DataLoader, SequentialSampler
 from tqdm import tqdm
 
-from data_processing import *
 from models.ensemble import Ensemble
 from post_processing import *
-from torch_context import TorchContext
+from utils.torch_context import TorchContext
 from transforms import *
 from segmentation import collate_subjects, dont_collate, filter_transform
 

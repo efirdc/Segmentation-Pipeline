@@ -7,10 +7,10 @@ import copy
 
 import pandas as pd
 
-from utils import vargs_or_sequence, Config
+from ..utils import auto_str, vargs_or_sequence
 
 
-class SubjectLoader(ABC, Config):
+class SubjectLoader(ABC):
     """ Abstract class for loading subject data.
 
     All subclasses must overwrite the `__call__` method,
@@ -22,6 +22,9 @@ class SubjectLoader(ABC, Config):
     @abstractmethod
     def __call__(self, subject_data):
         raise NotImplementedError()
+
+    def __repr__(self):
+        return auto_str(self)
 
 
 class AttributeLoader(SubjectLoader):

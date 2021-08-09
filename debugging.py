@@ -1,8 +1,8 @@
 import torch
-from utils import load_module
-import torch
 import torchio as tio
 from torch.utils.data import DataLoader
+
+from segmentation_pipeline import load_module
 
 if __name__ == "__main__":
     config = load_module("./configs/msseg2.py")

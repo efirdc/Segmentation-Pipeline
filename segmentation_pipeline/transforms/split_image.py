@@ -1,5 +1,4 @@
 import torchio as tio
-import torch
 from typing import Sequence
 
 
