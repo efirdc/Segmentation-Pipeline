@@ -145,6 +145,4 @@ if __name__ == "__main__":
                           preload_validation_data=args.preload_validation_data,
                           num_workers=args.num_workers,
                           validation_batch_size=args.validation_batch_size,
-                          validation_patch_batch_size=args.validation_batch_size,
-                          patch_queue_length=args.patch_queue_length,
                           logger=logger)
