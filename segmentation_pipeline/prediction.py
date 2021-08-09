@@ -139,8 +139,10 @@ def add_evaluation_labels(subjects: Sequence[tio.Subject]):
 
         if 'y_pred' in subject:
             pred_subject = tio.Subject({'y': subject['y_pred']})
-            subject['y_pred_eval'] = evaluation_transform(pred_subject)['y']
+            y_pred_eval = evaluation_transform(pred_subject).get_first_image()
+            subject.add_image(y_pred_eval, 'y_pred_eval')
 
         if 'y' in subject:
             target_subject = tio.Subject({'y': subject['y']})
-            subject['y_eval'] = evaluation_transform(target_subject)['y']
+            y_eval = evaluation_transform(target_subject).get_first_image()
+            subject.add_image(y_eval, 'y_eval')
