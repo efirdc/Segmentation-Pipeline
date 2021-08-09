@@ -1,9 +1,15 @@
 from collections import OrderedDict
-from math import prod
 
 import torch
 from torch import nn
 import torch.nn.functional as F
+
+
+def prod(sequence):
+    out = 1
+    for elem in sequence:
+        out *= elem
+    return out
 
 
 class Block3d(nn.Module):
