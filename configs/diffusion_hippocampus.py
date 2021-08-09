@@ -118,19 +118,16 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
     def scoring_function(evaluation_dict):
 
         # Grab the output of the SegmentationEvaluator on the cbbrain and ab300 validation cohorts
-        seg_eval_cbbrain = evaluation_dict['segmentation_eval']['cbbrain_validation']
-        seg_eval_ab300 = evaluation_dict['segmentation_eval']['ab300_validation']
+        seg_eval_cbbrain = evaluation_dict['segmentation_eval']['cbbrain_validation']["summary_stats"]
+        seg_eval_ab300 = evaluation_dict['segmentation_eval']['ab300_validation']["summary_stats"]
 
         # Get the mean dice for each label (the mean is across subjects)
-        # The SegmentationEvaluator output includes a "summary_stats" dict with the following key structure
-        # {summary_stat_name: {stat_name: {label_name: value}}}
-        cbbrain_dice = seg_eval_cbbrain["summary_stats"]['mean']['dice']
-        ab300_dice = seg_eval_ab300["summary_stats"]['mean']['dice']
+        cbbrain_dice = seg_eval_cbbrain['mean', :, 'dice']
+        ab300_dice = seg_eval_ab300['mean', :, 'dice']
 
         # Now take the mean across all labels
-        from statistics import mean
-        cbbrain_dice = mean(cbbrain_dice.values())
-        ab300_dice = mean(ab300_dice.values())
+        cbbrain_dice = cbbrain_dice.mean()
+        ab300_dice = ab300_dice.mean()
 
         # Model must perform equally well on cbbrain and ab300
         score = (cbbrain_dice + ab300_dice) / 2
