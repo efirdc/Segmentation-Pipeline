@@ -4,7 +4,7 @@ import torch
 from skimage.morphology import label
 
 from .evaluator import Evaluator
-from .evaluation_dict import EvaluationDict
+from .labeled_tensor import LabeledTensor
 
 
 def msseg_detection_test(
@@ -99,8 +99,8 @@ class InstanceSegmentationEvaluator(Evaluator):
 
     def __call__(self, subjects):
         subject_names = [subject['name'] for subject in subjects]
-        subject_stats = EvaluationDict(dimensions=['subject', 'stat'],
-                                       dimension_keys=[subject_names, self.stats_to_output])
+        subject_stats = LabeledTensor(dim_names=['subject', 'stat'],
+                                      dim_keys=[subject_names, self.stats_to_output])
 
         for subject in subjects:
             pred_data = subject[self.prediction_label_map_name].data > 0

@@ -1,7 +1,7 @@
 from typing import Sequence
 
 from .evaluator import Evaluator
-from .evaluation_dict import EvaluationDict
+from .labeled_tensor import LabeledTensor
 
 
 class SegmentationEvaluator(Evaluator):
@@ -58,8 +58,8 @@ class SegmentationEvaluator(Evaluator):
         label_names = list(label_values.keys())
         subject_names = [subject['name'] for subject in subjects]
 
-        subject_stats = EvaluationDict(dimensions=['subject', 'label', 'stat'],
-                                       dimension_keys=[subject_names, label_names, self.stats_to_output])
+        subject_stats = LabeledTensor(dim_names=['subject', 'label', 'stat'],
+                                      dim_keys=[subject_names, label_names, self.stats_to_output])
 
         for subject in subjects:
             pred_data = subject[self.prediction_label_map_name].data

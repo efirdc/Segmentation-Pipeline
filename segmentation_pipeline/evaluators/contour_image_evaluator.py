@@ -10,6 +10,8 @@ from PIL import Image
 from torchvision.utils import make_grid
 
 from .evaluator import Evaluator
+from ..transforms import FindInterestingSlice
+from ..utils import slice_volume
 
 
 class ContourImageEvaluator(Evaluator):
