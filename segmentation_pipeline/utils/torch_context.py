@@ -215,18 +215,18 @@ class TorchContext:
     def get_config(self, component_names=None):
         config = self.config.copy()
 
-        for defn in self.component_definitions:
+        if component_names is None:
+            component_definitions = self.component_definitions
+        else:
+            component_definitions = [
+                defn for defn in self.component_definitions
+                if defn['name'] in component_names
+            ]
 
-            if component_names and defn['name'] not in component_names:
-                continue
-
-            for param, value in defn["params"].items():
-                if isinstance(value, Number) or isinstance(value, str):
-                    config[f"{defn['name']}.{param}"] = value
-                elif isinstance(value, Config):
-                    config[f"{defn['name']}.{param}"] = value.get_nested_config()
-                else:
-                    config[f"{defn['name']}.{param}"] = str(value)
+        component_definition_dict = {
+            defn['name']: defn['params'] for defn in component_definitions}
+        component_configs = get_nested_config(component_definition_dict)
+        config.update(component_configs)
 
         return config
 
