@@ -1,19 +1,10 @@
 import os
 
-from torch.utils.data.sampler import RandomSampler
-
-from torch_context import TorchContext
-import torchio as tio
-from segmentation_trainer import SegmentationTrainer, ScheduledEvaluation
-from models import NestedResUNet
-from evaluation import HybridLogisticDiceLoss
 from torch.optim import Adam
+from torch.utils.data.sampler import RandomSampler, SequentialSampler
+import torchio as tio
 
-from transforms import *
-from data_processing import *
-from evaluators import *
-from predictors import *
-from dataLoaderFactory import *
+from segmentation_pipeline import *
 
 
 def get_context(device, variables, predict_hbt=False, **kwargs):
@@ -82,25 +73,19 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
     context.add_component("dataset", SubjectFolder, root='$DATASET_PATH', subject_path="subjects",
                           subject_loader=subject_loader, cohorts=cohorts, transforms=transforms)
     context.add_component("model", NestedResUNet, input_channels=3, output_channels=4 if predict_hbt else 2,
-                          filters=40, dropout_p=0.2, saggital_split=True)
+                          filters=40, dropout_p=0.2)
     context.add_component("optimizer", Adam, params="self.model.parameters()", lr=0.0002)
     context.add_component("criterion", HybridLogisticDiceLoss)
 
-    plot_subjects = ["cbbrain_042", "cbbrain_082", "cbbrain_143",
-                     "cbbrain_036", "cbbrain_039", "cbbrain_190",  # FASD
-                     "ab300_002", "ab300_005", "ab300_090"]
-
-    one_time_evaluators = [
-        ScheduledEvaluation(evaluator=LabelMapEvaluator('y_eval'),
-                            log_name="ground_truth_label_eval",
-                            cohorts=['labeled']),
-    ]
-
     training_evaluators = [
         ScheduledEvaluation(evaluator=SegmentationEvaluator('y_pred_eval', 'y_eval'),
-                            log_name='training_segmentation_eval'),
-        ScheduledEvaluation(evaluator=LabelMapEvaluator('y_pred_eval'),
-                            log_name='training_label_eval'),
+                            log_name='training_segmentation_eval',
+                            interval=10),
+        ScheduledEvaluation(evaluator=ContourImageEvaluator("Axial", 'mean_dwi', 'y_pred_eval', 'y_eval',
+                                                            slice_id=0, legend=True, ncol=2, interesting_slice=True,
+                                                            split_subjects=False),
+                            log_name=f"contour_image",
+                            interval=10),
     ]
 
     validation_evaluators = [
@@ -110,59 +95,58 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
                             interval=250),
         ScheduledEvaluation(evaluator=SegmentationEvaluator("y_pred_eval", "y_eval"),
                             log_name="segmentation_eval",
-                            cohorts=['cbbrain_validation', "ab300_validation", "fasd"],
+                            cohorts=['cbbrain_validation', "ab300_validation"],
                             interval=50),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Axial", "mean_dwi", "y_pred_eval", "y_eval",
-                                                            slice_id=10, legend=True, ncol=3),
+                                                            slice_id=0, legend=True, ncol=6, interesting_slice=True,
+                                                            split_subjects=False),
                             log_name="contour_image_01",
-                            subjects=plot_subjects,
-                            interval=10),
+                            cohorts=['cbbrain_validation', "ab300_validation"],
+                            interval=25),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Coronal", "mean_dwi", "y_pred_eval", "y_eval",
-                                                            slice_id=35, legend=True, ncol=1),
+                                                            slice_id=0, legend=True, ncol=4, interesting_slice=True,
+                                                            split_subjects=False),
                             log_name="contour_image_02",
-                            subjects=plot_subjects,
-                            interval=10),
+                            cohorts=['cbbrain_validation', "ab300_validation"],
+                            interval=25),
     ]
 
     def scoring_function(evaluation_dict):
 
         # Grab the output of the SegmentationEvaluator on the cbbrain and ab300 validation cohorts
-        seg_eval_cbbrain = evaluation_dict['segmentation_eval']['cbbrain_validation']
-        seg_eval_ab300 = evaluation_dict['segmentation_eval']['ab300_validation']
+        seg_eval_cbbrain = evaluation_dict['segmentation_eval']['cbbrain_validation']["summary_stats"]
+        seg_eval_ab300 = evaluation_dict['segmentation_eval']['ab300_validation']["summary_stats"]
 
         # Get the mean dice for each label (the mean is across subjects)
-        # The SegmentationEvaluator output includes a "summary_stats" dict with the following key structure
-        # {summary_stat_name: {stat_name: {label_name: value}}}
-        cbbrain_dice = seg_eval_cbbrain["summary_stats"]['mean']['dice']
-        ab300_dice = seg_eval_ab300["summary_stats"]['mean']['dice']
+        cbbrain_dice = seg_eval_cbbrain['mean', :, 'dice']
+        ab300_dice = seg_eval_ab300['mean', :, 'dice']
 
         # Now take the mean across all labels
-        from statistics import mean
-        cbbrain_dice = mean(cbbrain_dice.values())
-        ab300_dice = mean(ab300_dice.values())
+        cbbrain_dice = cbbrain_dice.mean()
+        ab300_dice = ab300_dice.mean()
 
         # Model must perform equally well on cbbrain and ab300
         score = (cbbrain_dice + ab300_dice) / 2
         return score
 
-    train_predictor = StandardPredict(device, sagittal_split=True, image_names=['X', 'y'])
-    val_predictor = StandardPredict(device, sagittal_split=True, image_names=['X'])
+    train_predictor = StandardPredict(sagittal_split=True, image_names=['X', 'y'])
+    validation_predictor = StandardPredict(sagittal_split=True, image_names=['X'])
 
-    train_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)
-    val_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)
+    train_dataloader_factory = StandardDataLoader(sampler=RandomSampler)
+    validation_dataloader_factory = StandardDataLoader(sampler=SequentialSampler)
 
     context.add_component("trainer", SegmentationTrainer,
                           training_batch_size=2,
                           save_rate=100,
                           scoring_interval=50,
                           scoring_function=scoring_function,
-                          one_time_evaluators=one_time_evaluators,
+                          one_time_evaluators=[],
                           training_evaluators=training_evaluators,
                           validation_evaluators=validation_evaluators,
                           max_iterations_with_no_improvement=500,                           
                           train_predictor=train_predictor,
-                          val_predictor=val_predictor,
+                          validation_predictor=validation_predictor,
                           train_dataloader_factory=train_dataloader_factory,
-                          val_dataloader_factory=val_dataloader_factory)
+                          validation_dataloader_factory=validation_dataloader_factory)
 
     return context

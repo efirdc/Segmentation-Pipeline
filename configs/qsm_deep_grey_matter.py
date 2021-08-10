@@ -1,15 +1,7 @@
-from torch_context import TorchContext
-import torchio as tio
-from data_processing.subject_folder import SubjectFolder
-from segmentation_trainer import SegmentationTrainer
-from models import NestedResUNet
-from evaluation import HybridLogisticDiceLoss
-from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data import RandomSampler
 from torch.optim import Adam
 
-from transforms import *
-from predictors import *
-from dataLoaderFactory import *
+from segmentation_pipeline import *
 
 
 def get_context(device, variables, **kwargs):
@@ -78,8 +70,8 @@ def get_context(device, variables, **kwargs):
     train_predictor = StandardPredict(device, image_names=['X', 'y'])
     val_predictor = StandardPredict(device, image_names=['X'])
 
-    train_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)
-    val_dataloader_factory = StandardDataLoader(sampler=RandomSampler, collate_fn=dont_collate)
+    train_dataloader_factory = StandardDataLoader(sampler=RandomSampler)
+    val_dataloader_factory = StandardDataLoader(sampler=RandomSampler)
 
     context.add_component("trainer", SegmentationTrainer, save_folder="$CHECKPOINTS_PATH", sample_rate=50, save_rate=250,
                           val_datasets=[

@@ -1,20 +1,11 @@
 import os
 
-import torchio as tio
-from torch.optim import Adam, SGD
 import torch
+from torch.optim import SGD
 from torch.utils.data.sampler import SequentialSampler
+import torchio as tio
 
-from torch_context import TorchContext
-from segmentation_trainer import SegmentationTrainer, ScheduledEvaluation
-from models import *
-from evaluation import HybridLogisticDiceLoss
-from transforms import *
-from data_processing import *
-from evaluators import *
-from predictors import *
-from dataLoaderFactory import *
-from utils import dont_collate
+from segmentation_pipeline import *
 
 
 def get_context(device, variables, fold=0, **kwargs):
@@ -145,8 +136,7 @@ def get_context(device, variables, fold=0, **kwargs):
         return score
 
     train_predictor = StandardPredict(device, image_names=['X', 'y'])
-    val_predictor = PatchPredict(
-        device=device,
+    validation_predictor = PatchPredict(
         patch_batch_size=32,
         patch_size=config['patch_size'], 
         patch_overlap=(config['patch_size'] // 8),
@@ -156,8 +146,8 @@ def get_context(device, variables, fold=0, **kwargs):
     )
 
     patch_sampler = tio.WeightedSampler(patch_size=config['patch_size'], probability_map='patch_probability')
-    train_dataloader_factory = PatchDataLoader(max_length=100, samples_per_volume=1, sampler=patch_sampler, collate_fn=dont_collate)
-    val_dataloader_factory = StandardDataLoader(sampler=SequentialSampler, collate_fn=dont_collate)
+    train_dataloader_factory = PatchDataLoader(max_length=100, samples_per_volume=1, sampler=patch_sampler)
+    validation_dataloader_factory = StandardDataLoader(sampler=SequentialSampler)
 
     context.add_component("trainer", SegmentationTrainer,
                           training_batch_size=4,
@@ -169,8 +159,8 @@ def get_context(device, variables, fold=0, **kwargs):
                           validation_evaluators=validation_evaluators,
                           max_iterations_with_no_improvement=2000,
                           train_predictor=train_predictor,
-                          val_predictor=val_predictor,
+                          validation_predictor=validation_predictor,
                           train_dataloader_factory=train_dataloader_factory,
-                          val_dataloader_factory=val_dataloader_factory)
+                          validation_dataloader_factory=validation_dataloader_factory)
 
     return context
