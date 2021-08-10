@@ -92,16 +92,18 @@ class WandbLogger(Logger):
         print(str(context))
 
     def save_context(self, context, sub_folder, iteration):
-        sub_dir = os.path.join(self.save_folder, sub_folder)
-        if not os.path.exists(sub_dir):
-            os.makedirs(sub_dir)
-        file_path = os.path.join(sub_dir, f"{context.name}-iter{iteration:08}.pt")
-        context.save(file_path)
-        WandbLogger.wandb_save(file_path)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ResourceWarning)
+            sub_dir = os.path.join(self.save_folder, sub_folder)
+            if not os.path.exists(sub_dir):
+                os.makedirs(sub_dir)
+            file_path = os.path.join(sub_dir, f"{context.name}-iter{iteration:08}.pt")
+            context.save(file_path)
+            WandbLogger.wandb_save(file_path)
 
     def log(self, log_dict):
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+            warnings.filterwarnings("ignore", category=ResourceWarning)
             wandb.log(to_wandb(log_dict))
 
     @staticmethod
