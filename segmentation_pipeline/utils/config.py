@@ -56,7 +56,7 @@ class Config:
     def get_nested_config(self) -> Dict[str, Any]:
         return get_nested_config(self)
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         config = self.get_config()
         config_str = ", ".join([f"{param_name}={arg}" for param_name, arg in config.items()])
         return f"{self.__class__.__name__}({config_str})"
