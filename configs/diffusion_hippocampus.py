@@ -77,21 +77,15 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
     context.add_component("optimizer", Adam, params="self.model.parameters()", lr=0.0002)
     context.add_component("criterion", HybridLogisticDiceLoss)
 
-    plot_subjects = ["cbbrain_042", "cbbrain_082", "cbbrain_143",
-                     "cbbrain_036", "cbbrain_039", "cbbrain_190",  # FASD
-                     "ab300_002", "ab300_005", "ab300_090"]
-
-    one_time_evaluators = [
-        ScheduledEvaluation(evaluator=LabelMapEvaluator('y_eval'),
-                            log_name="ground_truth_label_eval",
-                            cohorts=['labeled']),
-    ]
-
     training_evaluators = [
         ScheduledEvaluation(evaluator=SegmentationEvaluator('y_pred_eval', 'y_eval'),
-                            log_name='training_segmentation_eval'),
-        ScheduledEvaluation(evaluator=LabelMapEvaluator('y_pred_eval'),
-                            log_name='training_label_eval'),
+                            log_name='training_segmentation_eval',
+                            interval=10),
+        ScheduledEvaluation(evaluator=ContourImageEvaluator("Axial", 'mean_dwi', 'y_pred_eval', 'y_eval',
+                                                            slice_id=0, legend=True, ncol=2, interesting_slice=True,
+                                                            split_subjects=False),
+                            log_name=f"contour_image",
+                            interval=10),
     ]
 
     validation_evaluators = [
@@ -101,18 +95,20 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
                             interval=250),
         ScheduledEvaluation(evaluator=SegmentationEvaluator("y_pred_eval", "y_eval"),
                             log_name="segmentation_eval",
-                            cohorts=['cbbrain_validation', "ab300_validation", "fasd"],
+                            cohorts=['cbbrain_validation', "ab300_validation"],
                             interval=50),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Axial", "mean_dwi", "y_pred_eval", "y_eval",
-                                                            slice_id=10, legend=True, ncol=3),
+                                                            slice_id=0, legend=True, ncol=6, interesting_slice=True,
+                                                            split_subjects=False),
                             log_name="contour_image_01",
-                            subjects=plot_subjects,
-                            interval=10),
+                            cohorts=['cbbrain_validation', "ab300_validation"],
+                            interval=25),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Coronal", "mean_dwi", "y_pred_eval", "y_eval",
-                                                            slice_id=35, legend=True, ncol=1),
+                                                            slice_id=0, legend=True, ncol=4, interesting_slice=True,
+                                                            split_subjects=False),
                             log_name="contour_image_02",
-                            subjects=plot_subjects,
-                            interval=10),
+                            cohorts=['cbbrain_validation', "ab300_validation"],
+                            interval=25),
     ]
 
     def scoring_function(evaluation_dict):
@@ -144,7 +140,7 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
                           save_rate=100,
                           scoring_interval=50,
                           scoring_function=scoring_function,
-                          one_time_evaluators=one_time_evaluators,
+                          one_time_evaluators=[],
                           training_evaluators=training_evaluators,
                           validation_evaluators=validation_evaluators,
                           max_iterations_with_no_improvement=500,                           

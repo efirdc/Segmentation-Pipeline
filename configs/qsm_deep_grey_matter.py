@@ -1,15 +1,7 @@
-from torch_context import TorchContext
-import torchio as tio
-from data_processing.subject_folder import SubjectFolder
-from segmentation_trainer import SegmentationTrainer
-from models import NestedResUNet
-from evaluation import HybridLogisticDiceLoss
-from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data import RandomSampler
 from torch.optim import Adam
 
-from transforms import *
-from prediction import *
-from data_loader_factory import *
+from segmentation_pipeline import *
 
 
 def get_context(device, variables, **kwargs):
