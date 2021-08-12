@@ -9,4 +9,4 @@ torch
 torchio
 torchvision
 wandb
-
+sklearn
