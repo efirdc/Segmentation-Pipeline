@@ -6,6 +6,8 @@ import json
 import copy
 
 import pandas as pd
+import numpy as np
+import torch
 
 from ..utils import auto_str, vargs_or_sequence
 
@@ -161,3 +163,62 @@ class ComposeLoaders(SubjectLoader):
     def __call__(self, subject_data):
         for loader in self.loaders:
             loader(subject_data)
+
+
+class TensorLoader(SubjectLoader):
+    """Loads subject tensor data from a space delimited text file.
+
+    Args:
+        tensor_name: Key for the Tensor in the dictionary
+        glob_pattern: glob file pattern to match data files relative to a subject's folder.
+            see https://en.wikipedia.org/wiki/Glob_(programming)
+            If the glob pattern matches multiple files, then they are all loaded.
+        uniform: Set to true if the glob pattern points to the same file for all subjects.
+            The file will be cached for efficiency.
+        belongs_to: A key to an existing dictionary in the subject.
+            The loaded attributes will be added to this dictionary instead of the subject root.
+            This can be used to add properties to tio.Image, e.g. label values and colors for a label map
+    """
+    def __init__(
+            self,
+            glob_pattern: str,
+            tensor_name: str,
+            uniform: bool = False,
+            belongs_to: str = None
+    ):
+        self.glob_pattern = glob_pattern
+        self.tensor_name = tensor_name
+        self.uniform = uniform
+        self.belongs_to = belongs_to
+
+        self.uniform_cache = {}
+
+    def __call__(self, subject_data):
+        subject_folder = subject_data['folder']
+        matching_files = glob(f"{subject_folder}/{self.glob_pattern}")
+
+        if len(matching_files) > 1:
+            raise RuntimeError(f"More than one {self.tensor_name} file found in {subject_folder}/{self.glob_pattern}")
+
+        for matching_file in matching_files:
+
+            data = self.load_file(matching_file)
+
+            if self.belongs_to is not None:
+                subject_data[self.belongs_to].update(data)
+            else:
+                subject_data.update(data)
+
+    def load_file(self, file_path):
+
+        if self.uniform and file_path in self.uniform_cache:
+            return self.uniform_cache[file_path]
+
+
+        data = dict()
+        data[self.tensor_name] = torch.from_numpy(np.loadtxt(file_path, delimiter=' '))
+
+        if self.uniform:
+            self.uniform_cache[file_path] = data
+
+        return data
