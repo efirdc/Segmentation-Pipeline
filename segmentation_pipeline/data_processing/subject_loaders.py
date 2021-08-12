@@ -214,7 +214,6 @@ class TensorLoader(SubjectLoader):
         if self.uniform and file_path in self.uniform_cache:
             return self.uniform_cache[file_path]
 
-
         data = dict()
         data[self.tensor_name] = torch.from_numpy(np.loadtxt(file_path, delimiter=' '))
 
