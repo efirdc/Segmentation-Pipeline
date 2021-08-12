@@ -132,14 +132,8 @@ class ComposeFilters(SubjectFilter):
         self.filters = vargs_or_sequence(filters)
 
     def apply_filter(self, subjects):
-        groups = [
-            subject_filter(subjects)
-            for subject_filter in self.filters
-        ]
-        subjects = [
-            subject for subject in subjects
-            if all(subject in group for group in groups)
-        ]
+        for subject_filter in self.filters:
+            subjects = subject_filter(subjects)
         return subjects
 
 
