@@ -2,6 +2,7 @@ import importlib.util
 from pathlib import Path
 from typing import Sequence
 from inspect import signature
+from random import Random
 
 import torch
 import torchio as tio
@@ -134,3 +135,9 @@ def auto_str(obj):
     out_str = ", ".join([f"{param_name}={arg}" for param_name, arg in arg_dict.items()])
     out_str = f"{obj.__class__.__name__}({out_str})"
     return out_str
+
+
+def random_folds(size, num_folds, seed):
+    fold_ids = [i % num_folds for i in range(size)]
+    Random(seed).shuffle(fold_ids)
+    return fold_ids

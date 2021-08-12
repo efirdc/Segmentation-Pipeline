@@ -3,7 +3,7 @@ from typing import Sequence, Dict, Union, Any
 
 import torchio as tio
 
-from ..utils import as_set, is_sequence, vargs_or_sequence, as_list, auto_str
+from ..utils import as_set, is_sequence, vargs_or_sequence, as_list, auto_str, random_folds
 
 
 class SubjectFilter:
@@ -206,8 +206,7 @@ class RandomFoldFilter(SubjectFilter):
         folds_assigned = any('fold' in subject for subject in subjects)
 
         if not folds_assigned:
-            fold_ids = [i % self.num_folds for i in range(len(subjects))]
-            Random(self.seed).shuffle(fold_ids)
+            fold_ids = random_folds(len(subjects), self.num_folds, self.seed)
 
             for i in range(len(subjects)):
                 subjects[i]['fold'] = fold_ids[i]
