@@ -6,5 +6,6 @@ from .subject_filters import (
     ComposeFilters,
     AnyFilter,
     NegateFilter,
-    RandomFoldFilter
+    RandomFoldFilter,
+    StratifiedFilter
 )

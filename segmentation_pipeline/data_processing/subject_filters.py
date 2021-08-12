@@ -1,9 +1,11 @@
-from random import Random
 from typing import Sequence, Dict, Union, Any
 
 import torchio as tio
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import KBinsDiscretizer
+import pandas as pd
 
-from ..utils import as_set, is_sequence, vargs_or_sequence, as_list, auto_str
+from ..utils import as_set, is_sequence, vargs_or_sequence, as_list, auto_str, random_folds
 
 
 class SubjectFilter:
@@ -132,14 +134,8 @@ class ComposeFilters(SubjectFilter):
         self.filters = vargs_or_sequence(filters)
 
     def apply_filter(self, subjects):
-        groups = [
-            subject_filter(subjects)
-            for subject_filter in self.filters
-        ]
-        subjects = [
-            subject for subject in subjects
-            if all(subject in group for group in groups)
-        ]
+        for subject_filter in self.filters:
+            subjects = subject_filter(subjects)
         return subjects
 
 
@@ -212,8 +208,7 @@ class RandomFoldFilter(SubjectFilter):
         folds_assigned = any('fold' in subject for subject in subjects)
 
         if not folds_assigned:
-            fold_ids = [i % self.num_folds for i in range(len(subjects))]
-            Random(self.seed).shuffle(fold_ids)
+            fold_ids = random_folds(len(subjects), self.num_folds, self.seed)
 
             for i in range(len(subjects)):
                 subjects[i]['fold'] = fold_ids[i]
@@ -226,5 +221,38 @@ class RandomFoldFilter(SubjectFilter):
         return subjects
 
 
+class StratifiedFilter(SubjectFilter):
+    def __init__(
+            self,
+            size: int,
+            continuous_attributes: Sequence[str],
+            discrete_attributes: Sequence[str],
+            n_continuous_bins: int = 10,
+            seed: int = 0
+    ):
+        self.size = size
+        self.continuous_attributes = continuous_attributes
+        self.discrete_attributes = discrete_attributes
+        self.n_continuous_bins = n_continuous_bins
+        self.seed = seed
 
+    def apply_filter(self, subjects):
+        split_attributes = list(self.continuous_attributes) + list(self.discrete_attributes)
+        df = pd.DataFrame(columns=["name"] + split_attributes)
 
+        for subject in subjects:
+            subject_dict = dict()
+            subject_dict["name"] = subject["name"]
+            for attribute in split_attributes:
+                subject_dict[attribute] = subject[attribute]
+            df = df.append(subject_dict, ignore_index=True)
+
+        for continuous_attribute in self.continuous_attributes:
+            discretizer = KBinsDiscretizer(n_bins=self.n_continuous_bins, encode="ordinal", strategy="quantile")
+            df[continuous_attribute] = discretizer.fit_transform(
+                df[continuous_attribute].to_numpy().reshape(-1, 1)
+            ).reshape(-1)
+
+        _, subjects = train_test_split(subjects, test_size=self.size, stratify=df[split_attributes],
+                                       random_state=self.seed)
+        return subjects

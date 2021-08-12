@@ -11,6 +11,7 @@ from .utils import (
     slice_volume,
     collate_subjects,
     flatten_nested_dict,
-    auto_str
+    auto_str,
+    random_folds
 )
 from .nn_unet_convert import save_dataset_as_nn_unet

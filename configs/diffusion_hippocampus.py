@@ -7,7 +7,12 @@ import torchio as tio
 from segmentation_pipeline import *
 
 
-def get_context(device, variables, predict_hbt=False, **kwargs):
+old_validation_split = [f"cbbrain_{subject_id:03}" for subject_id in (
+    32, 42, 55, 67, 82, 88, 96, 98, 102, 107, 110, 117, 123, 143, 145, 149, 173, 182, 184, 401
+)]
+
+
+def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
     context = TorchContext(device, name="dmri-hippo", variables=variables)
     context.file_paths.append(os.path.abspath(__file__))
 
@@ -25,26 +30,29 @@ def get_context(device, variables, predict_hbt=False, **kwargs):
                     label_values={"left_head": 1, "left_body": 2, "left_tail": 3, "right_head": 4, "right_body": 5,
                                  "right_tail": 6}
                     ),
-        AttributeLoader(glob_pattern='attributes.*')
+        AttributeLoader(glob_pattern='attributes.*'),
+        AttributeLoader(glob_pattern='../../attributes/cross_validation_split.json',
+                        multi_subject=True, uniform=True),
+        AttributeLoader(glob_pattern='../../attributes/ab300_validation_subjects.json',
+                        multi_subject=True, uniform=True),
+        AttributeLoader(glob_pattern='../../attributes/cbbrain_test_subjects.json',
+                        multi_subject=True, uniform=True),
     ])
 
     cohorts = {}
-    cbbrain_validation_subjects = [f"cbbrain_{subject_id:03}" for subject_id in (
-        32, 42, 55, 67, 82, 88, 96, 98, 102, 107, 110, 117, 123, 143, 145, 149, 173, 182, 184, 401
-    )]
     cohorts['all'] = RequireAttributes(input_images)
+    cohorts['cross_validation'] = RequireAttributes(['fold'])
     cohorts['training'] = ComposeFilters([
-        RequireAttributes(output_labels),
-        RequireAttributes({"pathologies": "None", "protocol": "cbbrain", "rescan_id": "None"}),
-        ForbidAttributes({"name": cbbrain_validation_subjects})
+        cohorts['cross_validation'], ForbidAttributes({"fold": fold})
     ])
+    cohorts['cbbrain_validation'] = ComposeFilters([
+        cohorts['cross_validation'], RequireAttributes({"fold": fold})
+    ])
+    cohorts['ab300_validation'] = RequireAttributes({'ab300_validation': True})
     cohorts['cbbrain'] = RequireAttributes({"protocol": "cbbrain"})
     cohorts['ab300'] = RequireAttributes({"protocol": "ab300"})
     cohorts['rescans'] = ForbidAttributes({"rescan_id": "None"})
-    cohorts['labeled'] = RequireAttributes(['y'])
-    cohorts['cbbrain_validation'] = RequireAttributes({"name": cbbrain_validation_subjects})
-    cohorts['ab300_validation'] = ComposeFilters([cohorts['ab300'], cohorts['labeled'], RequireAttributes({"rescan_id": "None"})])
-    cohorts['fasd'] = ComposeFilters([cohorts['labeled'], RequireAttributes({"pathologies": "FASD"})])
+    cohorts['fasd'] = RequireAttributes({"pathologies": "FASD"})
 
     common_transforms = tio.Compose([
         tio.Crop((62, 62, 70, 58, 0, 0)),
