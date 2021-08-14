@@ -18,4 +18,5 @@ from .target_resample import TargetResample
 from .enforce_consistent_affine import EnforceConsistentAffine
 from .min_size_pad import MinSizePad
 from .permute_dimensions import PermuteDimensions, RandomPermuteDimensions
+from .reconstruct_mean_dwi import ReconstructMeanDWI
 from .utils import filter_transform
