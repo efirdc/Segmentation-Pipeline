@@ -48,6 +48,7 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
     cohorts['cbbrain_validation'] = ComposeFilters([
         cohorts['cross_validation'], RequireAttributes({"fold": fold})
     ])
+    cohorts['cbbrain_test'] = RequireAttributes({'cbbrain_test': True})
     cohorts['ab300_validation'] = RequireAttributes({'ab300_validation': True})
     cohorts['cbbrain'] = RequireAttributes({"protocol": "cbbrain"})
     cohorts['ab300'] = RequireAttributes({"protocol": "ab300"})
