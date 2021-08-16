@@ -9,3 +9,4 @@ from .subject_filters import (
     RandomFoldFilter,
     StratifiedFilter
 )
+from .dataset_fingerprint import get_dataset_fingerprint
