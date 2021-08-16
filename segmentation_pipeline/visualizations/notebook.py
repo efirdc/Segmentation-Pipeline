@@ -1,5 +1,7 @@
+import math
 import os
 import random
+from typing import Sequence
 
 import torch
 import torchio as tio
@@ -22,6 +24,12 @@ def vis_features(x):
 
 
 def vis_subject(context, subject):
+    if isinstance(subject, Sequence):
+        subjects = subject
+        subject = subject[0]
+    elif isinstance(subject, tio.Subject):
+        subjects = [subject]
+
     images = {key: val for key, val in subject.items() if isinstance(val, tio.ScalarImage)}
     label_maps = {key: val for key, val in subject.items() if isinstance(val, tio.LabelMap)}
 
@@ -50,12 +58,13 @@ def vis_subject(context, subject):
                 plane=plane, image_name=image_name,
                 target_label_map_name=label_map_name if show_labels else None,
                 prediction_label_map_name=prediction_label_map_name if show_labels else None,
-                slice_id=slice_id, legend=legend, ncol=1, scale=scale, line_width=line_width,
+                slice_id=slice_id, legend=legend, ncol=int(math.sqrt(len(subjects))),
+                scale=scale, line_width=line_width,
                 interesting_slice=interesting_slice
             )
 
-            pil_image = evaluator([subject])
-            fig = plt.figure(figsize=(10, 10))
+            pil_image = evaluator(subjects)
+            fig = plt.figure(figsize=(14, 14))
             plt.imshow(pil_image)
             if not ticks:
                 plt.tick_params(which='both', bottom=False, top=False, left=False, labelbottom=False, labelleft=False)
