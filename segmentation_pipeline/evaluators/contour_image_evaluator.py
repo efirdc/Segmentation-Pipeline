@@ -75,12 +75,12 @@ class ContourImageEvaluator(Evaluator):
             return slice_property[plane][-1]
         return slice_property[plane][slice_id]
 
-    def slice_and_make_grid(self, subjects, plane, image_name, label_value, impute_shape, pad_value=0):
+    def slice_and_make_grid(self, subjects, plane, image_name, impute_shape, pad_value=0):
         slices = []
         for subject in subjects:
             slice_id, plane = self.get_slice_id(subject, plane)
             if image_name in subject:
-                slices.append(slice_volume(subject[image_name].data == label_value, 0, plane, slice_id).unsqueeze(0))
+                slices.append(slice_volume(subject[image_name].data, 0, plane, slice_id).unsqueeze(0))
             else:
                 slices.append(torch.zeros(impute_shape))
 
@@ -114,17 +114,19 @@ class ContourImageEvaluator(Evaluator):
         sample_slice = slice_volume(sample_subject[self.image_name].data, 0, plane, 0)
         impute_shape = sample_slice.shape
 
-        img = self.slice_and_make_grid(subjects, plane, self.image_name, 0, impute_shape, pad_value=-1)
+        img = self.slice_and_make_grid(subjects, plane, self.image_name, impute_shape, pad_value=-1)
         if out_target:
             y = {
                 label_name: self.slice_and_make_grid(
-                    subjects, plane, self.target_label_map_name, label_value, impute_shape).bool()
+                    subjects, plane, self.target_label_map_name, impute_shape
+                ) == label_value
                 for label_name, label_value in label_values.items()
             }
         if out_pred:
             y_pred = {
                 label_name: self.slice_and_make_grid(
-                    subjects, plane, self.prediction_label_map_name, label_value, impute_shape).bool()
+                    subjects, plane, self.prediction_label_map_name, impute_shape
+                ) == label_value
                 for label_name, label_value in label_values.items()
             }
 
