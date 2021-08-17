@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Sequence, Union
 from glob import glob
-import pathlib
+from pathlib import Path
 import json
 import copy
 
@@ -83,7 +83,7 @@ class AttributeLoader(SubjectLoader):
         if self.uniform and file_path in self.uniform_cache:
             return self.uniform_cache[file_path]
 
-        extension = pathlib.Path(file_path).suffix
+        extension = Path(file_path).suffix
 
         if extension == ".json":
             with open(file_path) as f:
@@ -130,10 +130,10 @@ class ImageLoader(SubjectLoader):
         self.uniform = uniform
         self.kwargs = kwargs
 
-        self.cache = None
+        self.cached_image = None
 
     def __call__(self, subject_data):
-        if self.uniform:
+        if self.uniform and self.cached_image is not None:
             subject_data[self.image_name] = copy.deepcopy(self.cached_image)
             return
 
@@ -142,7 +142,7 @@ class ImageLoader(SubjectLoader):
         if len(matching_files) == 0:
             return
 
-        new_image = self.image_constructor(*matching_files, **self.kwargs)
+        new_image = self.image_constructor(*matching_files, uniform=self.uniform, **self.kwargs)
         if self.uniform:
             self.cached_image = new_image
             new_image = copy.deepcopy(new_image)

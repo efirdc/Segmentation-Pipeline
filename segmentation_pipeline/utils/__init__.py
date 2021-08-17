@@ -15,3 +15,4 @@ from .utils import (
     random_folds
 )
 from .nn_unet_convert import save_dataset_as_nn_unet
+from .compact_json_encoder import CompactJSONEncoder

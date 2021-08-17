@@ -5,6 +5,7 @@ from .loggers import *
 from .models import *
 from .transforms import *
 from .utils import *
+from .visualizations import *
 from .data_loader_factory import (
     StandardDataLoader,
     PatchDataLoader,

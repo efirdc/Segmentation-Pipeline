@@ -23,6 +23,8 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
         ImageLoader(glob_pattern="mean_dwi.*", image_name='mean_dwi', image_constructor=tio.ScalarImage),
         ImageLoader(glob_pattern="md.*", image_name='md', image_constructor=tio.ScalarImage),
         ImageLoader(glob_pattern="fa.*", image_name='fa', image_constructor=tio.ScalarImage),
+        ImageLoader(glob_pattern="full_dwi.*", image_name='full_dwi', image_constructor=tio.ScalarImage),
+        TensorLoader(glob_pattern="full_dwi_grad.b", tensor_name="grad", belongs_to="full_dwi"),
         ImageLoader(glob_pattern="whole_roi.*", image_name="whole_roi", image_constructor=tio.LabelMap,
                     label_values={"left_whole": 1, "right_whole": 2}
                     ),
@@ -30,6 +32,8 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
                     label_values={"left_head": 1, "left_body": 2, "left_tail": 3, "right_head": 4, "right_body": 5,
                                  "right_tail": 6}
                     ),
+        ImageLoader(glob_pattern="../../atlas/whole_roi_union.*", image_name="whole_roi_union",
+                    image_constructor=tio.LabelMap, uniform=True),
         AttributeLoader(glob_pattern='attributes.*'),
         AttributeLoader(glob_pattern='../../attributes/cross_validation_split.json',
                         multi_subject=True, uniform=True),
@@ -48,18 +52,38 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
     cohorts['cbbrain_validation'] = ComposeFilters([
         cohorts['cross_validation'], RequireAttributes({"fold": fold})
     ])
+    cohorts['cbbrain_test'] = RequireAttributes({'cbbrain_test': True})
     cohorts['ab300_validation'] = RequireAttributes({'ab300_validation': True})
     cohorts['cbbrain'] = RequireAttributes({"protocol": "cbbrain"})
     cohorts['ab300'] = RequireAttributes({"protocol": "ab300"})
     cohorts['rescans'] = ForbidAttributes({"rescan_id": "None"})
     cohorts['fasd'] = RequireAttributes({"pathologies": "FASD"})
 
-    common_transforms = tio.Compose([
-        tio.Crop((62, 62, 70, 58, 0, 0)),
-        tio.Pad((0, 0, 0, 0, 2, 2), padding_mode="minimum"),
+    common_transforms_1 = tio.Compose([
+        tio.CropOrPad((96, 88, 24), padding_mode='minimum', mask_name='whole_roi_union'),
         MergeLabels([('left_whole', 'right_whole')], right_masking_method="Right", include="whole_roi"),
         MergeLabels([('left_head', 'right_head'), ('left_body', 'right_body'), ('left_tail', 'right_tail')],
                     right_masking_method="Right", include="hbt_roi"),
+    ])
+
+    noise = tio.RandomNoise(std=0.035, p=0.3)
+    blur = tio.RandomBlur((0, 1), p=0.2)
+    augmentations = tio.Compose([
+        tio.RandomFlip(axes=(0, 1, 2)),
+        tio.RandomElasticDeformation(p=0.5, num_control_points=(7, 7, 4), locked_borders=1,
+                                     image_interpolation='bspline'),
+        tio.RandomBiasField(p=0.5),
+        tio.RescaleIntensity((0, 1), (0.01, 99.9)),
+        tio.RandomGamma(p=0.8),
+        tio.RescaleIntensity((-1, 1)),
+        tio.OneOf([
+            tio.Compose([blur, noise]),
+            tio.Compose([noise, blur]),
+        ])
+    ])
+
+    common_transforms_2 = tio.Compose([
+        tio.RescaleIntensity((-1., 1.), (0.5, 99.5)),
         ConcatenateImages(image_names=["mean_dwi", "md", "fa"], image_channels=[1, 1, 1], new_image_name="X"),
         RenameProperty(old_name="hbt_roi" if predict_hbt else "whole_roi", new_name="y"),
         CustomOneHot(include="y")
@@ -67,14 +91,13 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
 
     transforms = {
         'default': tio.Compose([
-            tio.RescaleIntensity((-1, 1.), (0.5, 99.5)),
-            common_transforms
+            common_transforms_1,
+            common_transforms_2
         ]),
         'training': tio.Compose([
-            tio.RescaleIntensity((0, 1.), (0.5, 99.5)),
-            tio.RandomBiasField(coefficients=0.5, include=["mean_dwi"]),
-            tio.RescaleIntensity((-1, 1), (0., 99.5)),
-            common_transforms
+            common_transforms_1,
+            augmentations,
+            common_transforms_2
         ]),
     }
 
@@ -99,42 +122,36 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
     validation_evaluators = [
         ScheduledEvaluation(evaluator=LabelMapEvaluator('y_pred_eval'),
                             log_name="predicted_label_eval",
-                            cohorts=['cbbrain_validation', 'ab300'],
+                            cohorts=['cbbrain_validation', 'ab300_validation'],
                             interval=250),
         ScheduledEvaluation(evaluator=SegmentationEvaluator("y_pred_eval", "y_eval"),
                             log_name="segmentation_eval",
-                            cohorts=['cbbrain_validation', "ab300_validation"],
+                            cohorts=['cbbrain_validation'],
                             interval=50),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Axial", "mean_dwi", "y_pred_eval", "y_eval",
                                                             slice_id=0, legend=True, ncol=6, interesting_slice=True,
                                                             split_subjects=False),
                             log_name="contour_image_01",
-                            cohorts=['cbbrain_validation', "ab300_validation"],
+                            cohorts=['cbbrain_validation', 'ab300_validation'],
                             interval=25),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Coronal", "mean_dwi", "y_pred_eval", "y_eval",
                                                             slice_id=0, legend=True, ncol=4, interesting_slice=True,
                                                             split_subjects=False),
                             log_name="contour_image_02",
-                            cohorts=['cbbrain_validation', "ab300_validation"],
+                            cohorts=['cbbrain_validation', 'ab300_validation'],
                             interval=25),
     ]
 
     def scoring_function(evaluation_dict):
-
-        # Grab the output of the SegmentationEvaluator on the cbbrain and ab300 validation cohorts
+        # Grab the output of the SegmentationEvaluator
         seg_eval_cbbrain = evaluation_dict['segmentation_eval']['cbbrain_validation']["summary_stats"]
-        seg_eval_ab300 = evaluation_dict['segmentation_eval']['ab300_validation']["summary_stats"]
 
         # Get the mean dice for each label (the mean is across subjects)
         cbbrain_dice = seg_eval_cbbrain['mean', :, 'dice']
-        ab300_dice = seg_eval_ab300['mean', :, 'dice']
 
         # Now take the mean across all labels
         cbbrain_dice = cbbrain_dice.mean()
-        ab300_dice = ab300_dice.mean()
-
-        # Model must perform equally well on cbbrain and ab300
-        score = (cbbrain_dice + ab300_dice) / 2
+        score = cbbrain_dice
         return score
 
     train_predictor = StandardPredict(sagittal_split=True, image_names=['X', 'y'])
