@@ -49,7 +49,7 @@ class TorchContext:
         >>> context.init_components()
         >>>
         >>> # Initialized components are now accessible as context.component_name
-        >>> context.trainer.train(context, iterations=1000)
+        >>> context.trainer.train(context, max_iterations=1000)
     """
     def __init__(
             self,
@@ -73,7 +73,6 @@ class TorchContext:
 
         if file_path is not None:
             checkpoint = torch.load(file_path, map_location=torch.device(self.device))
-
 
             self.name = checkpoint["name"]
             self.component_definitions = checkpoint['component_definitions']
@@ -145,6 +144,12 @@ class TorchContext:
                 defn['params'].update(params)
                 return
 
+        raise ValueError(f"Could not find component {name} in the context.")
+
+    def get_component_definition(self, name):
+        for defn in self.component_definitions:
+            if defn['name'] == name:
+                return defn
         raise ValueError(f"Could not find component {name} in the context.")
 
     def keep_components(self, names):
