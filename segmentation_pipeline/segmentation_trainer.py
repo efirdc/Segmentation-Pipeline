@@ -1,8 +1,9 @@
+import math
 import time
 import os
 import signal
 import threading
-from typing import Sequence, Callable
+from typing import Sequence, Callable, Optional, Union
 
 import torch
 import torchio as tio
@@ -10,7 +11,7 @@ import torchio as tio
 from .evaluators import *
 from .data_processing import *
 from .loggers import *
-from .utils import TorchTimer, auto_str
+from .utils import TorchTimer, auto_str, time_str_to_seconds
 from .data_loader_factory import DataLoaderFactory
 from .prediction import Predictor, add_evaluation_labels
 
@@ -97,15 +98,26 @@ class SegmentationTrainer:
     def train(
             self,
             context,
-            iterations,
-            stop_time=None,
-            preload_training_data=False,
-            preload_validation_data=False,
-            num_workers=0,
-            validation_batch_size=16,
-            logger=NonLogger(),
-            **kwargs
+            max_iterations: int = None,
+            max_training_time: Optional[Union[int, str]] = None,
+            preload_training_data: bool = False,
+            preload_validation_data: bool = False,
+            num_workers: int = 0,
+            validation_batch_size: int = 16,
+            logger: Logger = NonLogger(),
+            force_continue: bool = False,
     ):
+        if max_training_time is not None:
+            training_time = time_str_to_seconds(max_training_time)
+            save_buffer = min(int(training_time * 0.1), 5 * 60)
+            stop_time = time.time() + training_time - save_buffer
+        else:
+            stop_time = math.inf
+
+        if force_continue:
+            self.max_score = float('-inf')
+            self.max_score_iteration = self.iteration
+
         print("Initializing logger.")
         logger.setup(context)
 
@@ -147,7 +159,7 @@ class SegmentationTrainer:
 
         # Training loop
         timer = TorchTimer(context.device)
-        for _ in range(iterations):
+        for _ in range(max_iterations):
             timer.start()
 
             subjects = next(training_data_iterator)
