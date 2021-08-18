@@ -7,6 +7,7 @@ from .subject_filters import (
     AnyFilter,
     NegateFilter,
     RandomFoldFilter,
-    StratifiedFilter
+    RandomSelectFilter,
+    StratifiedFilter,
 )
 from .dataset_fingerprint import get_dataset_fingerprint
