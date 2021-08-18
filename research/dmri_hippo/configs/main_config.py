@@ -12,7 +12,13 @@ old_validation_split = [f"cbbrain_{subject_id:03}" for subject_id in (
 )]
 
 
-def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
+def get_context(
+        device,
+        variables,
+        fold=0,
+        predict_hbt=False,
+        training_batch_size=4,
+):
     context = TorchContext(device, name="dmri-hippo", variables=variables)
     context.file_paths.append(os.path.abspath(__file__))
 
@@ -54,6 +60,9 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
     ])
     cohorts['cbbrain_test'] = RequireAttributes({'cbbrain_test': True})
     cohorts['ab300_validation'] = RequireAttributes({'ab300_validation': True})
+    cohorts['ab300_validation_plot'] = ComposeFilters([
+        cohorts['ab300_validation'], RandomSelectFilter(num_subjects=20)
+    ])
     cohorts['cbbrain'] = RequireAttributes({"protocol": "cbbrain"})
     cohorts['ab300'] = RequireAttributes({"protocol": "ab300"})
     cohorts['rescans'] = ForbidAttributes({"rescan_id": "None"})
@@ -68,10 +77,10 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
 
     noise = tio.RandomNoise(std=0.035, p=0.3)
     blur = tio.RandomBlur((0, 1), p=0.2)
-    augmentations = tio.Compose([
+    standard_augmentations = tio.Compose([
         tio.RandomFlip(axes=(0, 1, 2)),
         tio.RandomElasticDeformation(p=0.5, num_control_points=(7, 7, 4), locked_borders=1,
-                                     image_interpolation='bspline'),
+                                     image_interpolation='bspline', exclude="full_dwi"),
         tio.RandomBiasField(p=0.5),
         tio.RescaleIntensity((0, 1), (0.01, 99.9)),
         tio.RandomGamma(p=0.8),
@@ -80,7 +89,8 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
             tio.Compose([blur, noise]),
             tio.Compose([noise, blur]),
         ])
-    ])
+    ], exclude="full_dwi")
+    dwi_augmentation = ReconstructMeanDWI(num_dwis=(1, 25), num_directions=(1, 3), directionality=(4, 10))
 
     common_transforms_2 = tio.Compose([
         tio.RescaleIntensity((-1., 1.), (0.5, 99.5)),
@@ -96,15 +106,18 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
         ]),
         'training': tio.Compose([
             common_transforms_1,
-            augmentations,
+            tio.Compose([dwi_augmentation, standard_augmentations]),
             common_transforms_2
         ]),
     }
 
     context.add_component("dataset", SubjectFolder, root='$DATASET_PATH', subject_path="subjects",
                           subject_loader=subject_loader, cohorts=cohorts, transforms=transforms)
-    context.add_component("model", NestedResUNet, input_channels=3, output_channels=4 if predict_hbt else 2,
-                          filters=40, dropout_p=0.2)
+    context.add_component("model", NestedResUNet,
+                          input_channels=3,
+                          output_channels=4 if predict_hbt else 2,
+                          filters=40,
+                          dropout_p=0.2)
     context.add_component("optimizer", Adam, params="self.model.parameters()", lr=0.0002)
     context.add_component("criterion", HybridLogisticDiceLoss)
 
@@ -113,9 +126,8 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
                             log_name='training_segmentation_eval',
                             interval=10),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Axial", 'mean_dwi', 'y_pred_eval', 'y_eval',
-                                                            slice_id=0, legend=True, ncol=2, interesting_slice=True,
-                                                            split_subjects=False),
-                            log_name=f"contour_image",
+                                                            slice_id=12, legend=True, ncol=2, split_subjects=False),
+                            log_name=f"contour_image_training",
                             interval=10),
     ]
 
@@ -123,22 +135,20 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
         ScheduledEvaluation(evaluator=LabelMapEvaluator('y_pred_eval'),
                             log_name="predicted_label_eval",
                             cohorts=['cbbrain_validation', 'ab300_validation'],
-                            interval=250),
+                            interval=50),
         ScheduledEvaluation(evaluator=SegmentationEvaluator("y_pred_eval", "y_eval"),
                             log_name="segmentation_eval",
                             cohorts=['cbbrain_validation'],
                             interval=50),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Axial", "mean_dwi", "y_pred_eval", "y_eval",
-                                                            slice_id=0, legend=True, ncol=6, interesting_slice=True,
-                                                            split_subjects=False),
-                            log_name="contour_image_01",
-                            cohorts=['cbbrain_validation', 'ab300_validation'],
+                                                            slice_id=10, legend=True, ncol=5, split_subjects=False),
+                            log_name="contour_image_axial",
+                            cohorts=['cbbrain_validation', 'ab300_validation_plot'],
                             interval=25),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Coronal", "mean_dwi", "y_pred_eval", "y_eval",
-                                                            slice_id=0, legend=True, ncol=4, interesting_slice=True,
-                                                            split_subjects=False),
-                            log_name="contour_image_02",
-                            cohorts=['cbbrain_validation', 'ab300_validation'],
+                                                            slice_id=44, legend=True, ncol=2, split_subjects=False),
+                            log_name="contour_image_coronal",
+                            cohorts=['cbbrain_validation', 'ab300_validation_plot'],
                             interval=25),
     ]
 
@@ -161,7 +171,7 @@ def get_context(device, variables, fold=0, predict_hbt=False, **kwargs):
     validation_dataloader_factory = StandardDataLoader(sampler=SequentialSampler)
 
     context.add_component("trainer", SegmentationTrainer,
-                          training_batch_size=2,
+                          training_batch_size=training_batch_size,
                           save_rate=100,
                           scoring_interval=50,
                           scoring_function=scoring_function,
