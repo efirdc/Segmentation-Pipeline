@@ -171,39 +171,5 @@ def main(
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser(description="Auto Hippocampus Segmentation")
-    # parser.add_argument("ensemble_path", type=str, help="Folder with models")
-    # parser.add_argument("dataset_path", type=str, help="Path to the subjects data folders.")
-    # parser.add_argument(
-    #     "--output_filename",
-    #     type=str,
-    #     help="File name for segmentation output. Can specify .nii or .nii.gz if compression is desired."
-    #     "If output_filename is not provided the context name is used.",
-    # )
-    # parser.add_argument("--out_folder", type=str, default="", help="Folder for output.")
-    # parser.add_argument(
-    #     "--device",
-    #     type=str,
-    #     default="cpu",
-    #     help="PyTorch device to use. Set to 'cpu' if there are issues with gpu usage. A specific gpu can be selected"
-    #     " using 'cuda:0' or 'cuda:1' on a multi-gpu machine.",
-    # )
-    # parser.add_argument("--ensemble_flips", default=False, action="store_true")
-    # parser.add_argument("--ensemble_folds", default=False, action="store_true")
-    # parser.add_argument("--cohort", type=str, default=None)
-    # parser.add_argument(
-    #     "--num_workers",
-    #     type=int,
-    #     default=0,
-    #     help="How many CPU threads to use for data loading, preprocessing, and augmentation.",
-    # )
-    # parser.add_argument(
-    #     "--batch_size", type=int, default=4, help="How many subjects should be run through the model at once."
-    # )
-    # args = parser.parse_args()
-    # print(args)
-
-    # main(**vars(args))
-
     
     fire.Fire(main)
