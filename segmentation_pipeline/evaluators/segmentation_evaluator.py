@@ -71,10 +71,10 @@ class SegmentationEvaluator(Evaluator):
 
                 # Compute tensors for each statistic. Each element corresponds to one label.
                 spatial_dims = (1, 2, 3)
-                TP = (target_label & pred_label).sum(dim=spatial_dims)
-                FP = (~target_label & pred_label).sum(dim=spatial_dims)
-                TN = (~target_label & ~pred_label).sum(dim=spatial_dims)
-                FN = (target_label & ~pred_label).sum(dim=spatial_dims)
+                TP = (target_label & pred_label).sum(dim=spatial_dims).float()
+                FP = (~target_label & pred_label).sum(dim=spatial_dims).float()
+                TN = (~target_label & ~pred_label).sum(dim=spatial_dims).float()
+                FN = (target_label & ~pred_label).sum(dim=spatial_dims).float()
 
                 stats = {
                     'target_volume': TP + FN,
