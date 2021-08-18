@@ -19,7 +19,7 @@ if __name__ == "__main__":
         device = torch.device('cpu')
         print("CUDA is not available. Using CPU.")
 
-    config = load_module("../configs/diffusion_hippocampus.py")
+    config = load_module("configs/main_config.py")
 
     variables = dict(DATASET_PATH=args.dataset_path)
     context = config.get_context(device, variables)

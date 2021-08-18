@@ -1,4 +1,5 @@
 from typing import Sequence, Dict, Union, Any
+from random import Random
 
 import torchio as tio
 from sklearn.model_selection import train_test_split
@@ -177,6 +178,23 @@ class NegateFilter(SubjectFilter):
             subject for subject in subjects
             if subject not in remove_subjects
         ]
+        return subjects
+
+
+class RandomSelectFilter(SubjectFilter):
+    def __init__(
+            self,
+            num_subjects: int,
+            seed: int = 0,
+    ):
+        self.num_subjects = num_subjects
+        self.seed = seed
+
+    def apply_filter(self, subjects):
+        ids = list(range(len(subjects)))
+        Random(self.seed).shuffle(ids)
+        ids = set(ids[:self.num_subjects])
+        subjects = [subject for i, subject in enumerate(subjects) if i in ids]
         return subjects
 
 

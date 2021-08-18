@@ -10,3 +10,4 @@ torchio
 torchvision
 wandb
 sklearn
+fire

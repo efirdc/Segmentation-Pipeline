@@ -5,13 +5,14 @@ from typing import Sequence
 
 import torch
 import torchio as tio
-from ipywidgets import interact
 import matplotlib.pyplot as plt
 
 from ..evaluators import ContourImageEvaluator
 
 
 def vis_features(x):
+    from ipywidgets import interact
+
     N, C, W, H, D = x.shape
 
     @interact(i=(0, N-1), c=(0, C-1), d=(0, D-1))
@@ -24,6 +25,8 @@ def vis_features(x):
 
 
 def vis_subject(context, subject):
+    from ipywidgets import interact
+
     if isinstance(subject, Sequence):
         subjects = subject
         subject = subject[0]
@@ -79,6 +82,8 @@ def vis_subject(context, subject):
 
 
 def vis_model(context, subject):
+    from ipywidgets import interact
+
     X = subject['X']['data'].unsqueeze(0).to(context.device)
     modules = list(context.model.named_modules())
 

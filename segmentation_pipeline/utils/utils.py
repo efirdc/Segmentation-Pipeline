@@ -3,10 +3,14 @@ from pathlib import Path
 from typing import Sequence
 from inspect import signature
 from random import Random
+from typing import Optional
+import tarfile
+import shutil
 
 import torch
 import torchio as tio
 
+from ..typing import PathLike
 
 def no_op(x):
     return x
@@ -141,3 +145,57 @@ def random_folds(size, num_folds, seed):
     fold_ids = [i % num_folds for i in range(size)]
     Random(seed).shuffle(fold_ids)
     return fold_ids
+
+
+def prepare_dataset_files(
+        dataset_path: PathLike,
+        work_path: Optional[PathLike] = None
+):
+    """ Extract the dataset if it is a .tar file and copy it to work_dir if it is specified """
+    dataset_path = Path(dataset_path)
+    if dataset_path.is_file():
+        assert dataset_path.suffix == '.tar', f"Dataset file extension must be .tar not {dataset_path.suffix}"
+        if work_path is None:
+            extract_dir = dataset_path.parent
+        else:
+            extract_dir = Path(work_path)
+        extract_dir_contents = [child.stem for child in list(extract_dir.iterdir())]
+        with tarfile.open(name=dataset_path, mode="r") as tar:
+            first_tar_file = tar.getnames()[0]
+            if first_tar_file in extract_dir_contents:
+                print(f"Dataset already extracted to {extract_dir}")
+            else:
+                print(f"Extracting {dataset_path} to {extract_dir}")
+                tar.extractall(extract_dir)
+        dataset_path = extract_dir
+        contents = list(dataset_path.iterdir())
+        if len(contents) == 1:
+            dataset_path = contents[0]
+    elif work_path is not None:
+        work_path = Path(work_path) / dataset_path.stem
+        if work_path.exists():
+            print(f"Dataset already transfered to {work_path}")
+        else:
+            print(f"Copying dataset from {dataset_path} to {work_path}")
+            shutil.copytree(dataset_path, work_path)
+        dataset_path = work_path
+    print(f"Using dataset path {dataset_path}")
+    return dataset_path
+
+
+def time_str_to_seconds(time_str):
+    """
+    Converts a time string with format days-hours:minutes:seconds to the number of seconds (integer)
+    i.e. time_str_to_seconds("2-3:30:5") returns 185405,
+    the number of seconds in 2 days, 3 hours, 30 minutes, 5 seconds
+    """
+    dash_split = time_str.split("-")
+    assert len(dash_split) == 2
+    D = int(dash_split[0])
+    HMS = dash_split[1]
+
+    colon_split = [int(x) for x in HMS.split(":")]
+    assert len(colon_split) == 3
+    H, M, S = colon_split
+
+    return ((D * 24 + H) * 60 + M) * 60 + S

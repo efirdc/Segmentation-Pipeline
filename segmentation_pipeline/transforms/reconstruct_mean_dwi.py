@@ -50,7 +50,6 @@ class ReconstructMeanDWI(RandomTransform):
         num_dwis = self.get_num_dwis()
         num_directions = self.get_num_directions()
         directionality = self.get_directionality()
-        print(num_dwis, num_directions, directionality)
 
         random_directions = np.random.randn(3, num_directions)
         random_directions = random_directions / np.linalg.norm(random_directions, axis=0, keepdims=True)

@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from segmentation_pipeline import load_module
 
 if __name__ == "__main__":
-    config = load_module("./configs/msseg2.py")
+    config = load_module("research/msseg2/msseg2.py")
 
     if torch.cuda.is_available():
         device = torch.device('cuda')

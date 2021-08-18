@@ -46,7 +46,10 @@ class ContourImageEvaluator(Evaluator):
         if not self.interesting_slice:
             return self.slice_id, plane
 
-        image = subject[self.target_label_map_name]
+        if self.target_label_map_name in subject:
+            image = subject[self.target_label_map_name]
+        else:
+            image = subject[self.prediction_label_map_name]
 
         if 'interesting_slice_ids' not in image:
             image = FindInterestingSlice()(image)
@@ -96,8 +99,8 @@ class ContourImageEvaluator(Evaluator):
             }
 
     def get_image(self, subjects):
-        out_pred = self.prediction_label_map_name is not None
-        out_target = self.target_label_map_name is not None
+        out_pred = self.prediction_label_map_name is not None and self.prediction_label_map_name in subjects[0]
+        out_target = self.target_label_map_name is not None and self.target_label_map_name in subjects[0]
 
         if out_pred:
             label_values = subjects[0][self.prediction_label_map_name]['label_values']
