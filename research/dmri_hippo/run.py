@@ -79,7 +79,7 @@ def augmentation_experiment(
         num_cpu_threads: int = 4,
 ):
     dataset_path = prepare_dataset_files(dataset_path, work_path)
-    context = main_config.augmentation(
+    context = augmentation.get_context(
         device=torch.device(device),
         variables={"DATASET_PATH": str(dataset_path)},
         augmentation_mode=augmentation_mode,
