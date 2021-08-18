@@ -21,3 +21,6 @@ from .post_processing import (
     remove_small_components
 )
 from .segmentation_trainer import SegmentationTrainer, ScheduledEvaluation
+from .typing import (
+    PathLike
+)
