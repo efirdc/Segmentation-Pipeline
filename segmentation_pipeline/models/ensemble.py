@@ -38,7 +38,7 @@ def apply_strategy(
 class EnsembleModels(nn.Module):
     def __init__(self, models: Sequence[nn.Module], strategy: str = 'mean'):
         super().__init__()
-        self.models = models
+        self.models = nn.ModuleList(models)
         self.strategy = parse_strategy(strategy)
 
     def forward(self, x):
