@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 from torch.optim import Adam
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
@@ -131,8 +132,16 @@ def get_context(
                             interval=10),
     ]
 
+    curve_params = {
+        "left_whole": np.array([-1.96312119e-01,  9.46668029e+00,  2.33635173e+03]), 
+        "right_whole": np.array([-2.68467331e-01,  1.67925603e+01,  2.07224236e+03])
+    }
+
     validation_evaluators = [
-        ScheduledEvaluation(evaluator=LabelMapEvaluator('y_pred_eval'),
+        ScheduledEvaluation(evaluator=LabelMapEvaluator('y_pred_eval',
+                                                        curve_params=curve_params,
+                                                        curve_attribute='age',
+                                                        stats_to_output=('volume', 'error', 'absolute_error', 'squared_error', 'percent_diff')),
                             log_name="predicted_label_eval",
                             cohorts=['cbbrain_validation', 'ab300_validation'],
                             interval=50),
