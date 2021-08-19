@@ -55,9 +55,9 @@ def main(ground_truth_path: str, predictions_path: str, project: str, group: str
         subjects_table = wandb.Table(
             columns=list(results["subject_stats"].columns), data=results["subject_stats"].values.tolist()
         )
-        wandb.log({"subject_stats": subjects_table})
-
-        # not sure how to log summary results
+        summary_df = results["summary_stats"].to_dataframe()
+        summary_table = wandb.Table(columns=list(summary_df.columns), data=summary_df.values.tolist())
+        wandb.log({"subject_stats": subjects_table, "summary_stats": summary_table})
 
         # remove y_pred images for next run
         for subject in subjects.subjects:
@@ -65,5 +65,7 @@ def main(ground_truth_path: str, predictions_path: str, project: str, group: str
                 del subject["y_pred"]
 
         run.finish()
+
+
 if __name__ == "__main__":
     main("/Volumes/Extra Files/Diffusion_MRI/", "/Volumes/Extra Files/HippoPredictions", "hippo-eval", "run3")
