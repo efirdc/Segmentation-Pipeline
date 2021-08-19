@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:v100l:1
 #SBATCH --ntasks-per-node 1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=16G
 #SBATCH --time=0-8:0:0
 #SBATCH --account=def-uofavis-ab
@@ -18,7 +18,7 @@ python -m research.dmri_hippo.run augmentation_experiment \
 ~/projects/def-uofavis-ab/shared_data/Diffusion_MRI_cropped.tar \
 ~/scratch/Checkpoints/ \
 --work_path $SLURM_TMPDIR \
---augmentation_mode "no_augmentation" \
+--augmentation_mode "combined" \
 --max_training_time "0-8:0:0"  \
---num_cpu_threads 4
+--num_cpu_threads 8
 

@@ -178,7 +178,7 @@ def get_context(
                           one_time_evaluators=[],
                           training_evaluators=training_evaluators,
                           validation_evaluators=validation_evaluators,
-                          max_iterations_with_no_improvement=500,                           
+                          max_iterations_with_no_improvement=2000,
                           train_predictor=train_predictor,
                           validation_predictor=validation_predictor,
                           train_dataloader_factory=train_dataloader_factory,
