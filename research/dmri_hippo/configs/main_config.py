@@ -135,7 +135,7 @@ def get_context(
         ScheduledEvaluation(evaluator=LabelMapEvaluator('y_pred_eval'),
                             log_name="predicted_label_eval",
                             cohorts=['cbbrain_validation', 'ab300_validation'],
-                            interval=50),
+                            interval=250),
         ScheduledEvaluation(evaluator=SegmentationEvaluator("y_pred_eval", "y_eval"),
                             log_name="segmentation_eval",
                             cohorts=['cbbrain_validation'],
@@ -144,12 +144,12 @@ def get_context(
                                                             slice_id=10, legend=True, ncol=5, split_subjects=False),
                             log_name="contour_image_axial",
                             cohorts=['cbbrain_validation', 'ab300_validation_plot'],
-                            interval=25),
+                            interval=50),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Coronal", "mean_dwi", "y_pred_eval", "y_eval",
                                                             slice_id=44, legend=True, ncol=2, split_subjects=False),
                             log_name="contour_image_coronal",
                             cohorts=['cbbrain_validation', 'ab300_validation_plot'],
-                            interval=25),
+                            interval=50),
     ]
 
     def scoring_function(evaluation_dict):
