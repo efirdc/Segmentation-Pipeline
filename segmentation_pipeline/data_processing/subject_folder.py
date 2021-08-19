@@ -212,4 +212,8 @@ class SubjectFolder(Dataset):
             del subject_data['name']
             del subject_data['folder']
 
-            self.all_subjects_map[subject_name].update(subject_data)
+            # find the first subject with matching name, else return None
+            matched_subject = next((subject for subject in self.subjects if subject['name'] == subject_name), None)
+            if matched_subject is not None:
+                # update the primary object so other references such as subject_map are updated
+                matched_subject.update(subject_data)
