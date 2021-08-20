@@ -70,9 +70,9 @@ def get_context(
 
     common_transforms_1 = tio.Compose([
         tio.CropOrPad((96, 88, 24), padding_mode='minimum', mask_name='whole_roi_union'),
-        MergeLabels([('left_whole', 'right_whole')], right_masking_method="Right", include="whole_roi"),
-        MergeLabels([('left_head', 'right_head'), ('left_body', 'right_body'), ('left_tail', 'right_tail')],
-                    right_masking_method="Right", include="hbt_roi"),
+        CustomRemapLabels(remapping=[("right_whole", 2, 1)], masking_method="Right", include="whole_roi"),
+        CustomRemapLabels(remapping=[("right_head", 4, 1), ("right_body", 5, 2), ("right_tail", 6, 3)],
+                          masking_method="Right", include="hbt_roi"),
     ])
 
     noise = tio.RandomNoise(std=0.035, p=0.3)
