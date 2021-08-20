@@ -12,9 +12,9 @@ def get_context(
         augmentation_mode,
         **kwargs
 ):
-
     context = base_config.get_context(device, variables, **kwargs)
     context.file_paths.append(os.path.abspath(__file__))
+    context.config.update({'augmentation_mode': augmentation_mode})
 
     # training_transform is a tio.Compose where the second transform is the augmentation
     dataset_defn = context.get_component_definition("dataset")
