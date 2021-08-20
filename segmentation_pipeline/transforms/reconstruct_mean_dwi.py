@@ -78,7 +78,7 @@ class ReconstructMeanDWI(RandomTransform):
         elif isinstance(self.num_dwis, Tuple):
             low, high = self.num_dwis
             sample = np.random.rand()
-            sample = sample ** 3
+            sample = sample ** 2
             sample = sample * (high - low + 1) + low
             sample = int(sample)
             return sample

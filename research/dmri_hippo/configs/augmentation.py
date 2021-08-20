@@ -20,7 +20,7 @@ def get_context(
     dataset_defn = context.get_component_definition("dataset")
     training_transform = dataset_defn['params']['transforms']['training']
 
-    dwi_augmentation = ReconstructMeanDWI(num_dwis=(1, 25), num_directions=(1, 3), directionality=(4, 10))
+    dwi_augmentation = ReconstructMeanDWI(num_dwis=(1, 7), num_directions=(1, 3), directionality=(4, 10))
 
     noise = tio.RandomNoise(std=0.035, p=0.3)
     blur = tio.RandomBlur((0, 1), p=0.2)
