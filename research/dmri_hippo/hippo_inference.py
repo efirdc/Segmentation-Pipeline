@@ -128,7 +128,6 @@ def main(
         context = TorchContext(device, file_path=file_path, variables=dict(DATASET_PATH=dataset_path))
         context.keep_components(("model", "trainer", "dataset"))
         context.init_components()
-        context.model.eval()
 
         if ensemble_flips:
             context.model = EnsembleFlips(context.model, strategy="majority")
