@@ -71,9 +71,9 @@ def get_context(
 
     common_transforms_1 = tio.Compose([
         tio.CropOrPad((96, 88, 24), padding_mode='minimum', mask_name='whole_roi_union'),
-        MergeLabels([('left_whole', 'right_whole')], right_masking_method="Right", include="whole_roi"),
-        MergeLabels([('left_head', 'right_head'), ('left_body', 'right_body'), ('left_tail', 'right_tail')],
-                    right_masking_method="Right", include="hbt_roi"),
+        CustomRemapLabels(remapping=[("right_whole", 2, 1)], masking_method="Right", include="whole_roi"),
+        CustomRemapLabels(remapping=[("right_head", 4, 1), ("right_body", 5, 2), ("right_tail", 6, 3)],
+                          masking_method="Right", include="hbt_roi"),
     ])
 
     noise = tio.RandomNoise(std=0.035, p=0.3)
@@ -144,7 +144,7 @@ def get_context(
                                                         stats_to_output=('volume', 'error', 'absolute_error', 'squared_error', 'percent_diff')),
                             log_name="predicted_label_eval",
                             cohorts=['cbbrain_validation', 'ab300_validation'],
-                            interval=50),
+                            interval=250),
         ScheduledEvaluation(evaluator=SegmentationEvaluator("y_pred_eval", "y_eval"),
                             log_name="segmentation_eval",
                             cohorts=['cbbrain_validation'],
@@ -153,12 +153,12 @@ def get_context(
                                                             slice_id=10, legend=True, ncol=5, split_subjects=False),
                             log_name="contour_image_axial",
                             cohorts=['cbbrain_validation', 'ab300_validation_plot'],
-                            interval=25),
+                            interval=50),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Coronal", "mean_dwi", "y_pred_eval", "y_eval",
                                                             slice_id=44, legend=True, ncol=2, split_subjects=False),
                             log_name="contour_image_coronal",
                             cohorts=['cbbrain_validation', 'ab300_validation_plot'],
-                            interval=25),
+                            interval=50),
     ]
 
     def scoring_function(evaluation_dict):
@@ -187,7 +187,7 @@ def get_context(
                           one_time_evaluators=[],
                           training_evaluators=training_evaluators,
                           validation_evaluators=validation_evaluators,
-                          max_iterations_with_no_improvement=500,                           
+                          max_iterations_with_no_improvement=2000,
                           train_predictor=train_predictor,
                           validation_predictor=validation_predictor,
                           train_dataloader_factory=train_dataloader_factory,

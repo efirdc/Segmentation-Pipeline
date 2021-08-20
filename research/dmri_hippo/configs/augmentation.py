@@ -39,7 +39,7 @@ def get_context(
     ], exclude="full_dwi")
 
     if augmentation_mode == 'no_augmentation':
-        training_transform.transforms.remove(1)
+        training_transform.transforms.pop(1)
     elif augmentation_mode == 'standard':
         training_transform.transforms[1] = standard_augmentations
     elif augmentation_mode == 'dwi_reconstruction':

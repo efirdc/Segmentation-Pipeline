@@ -93,8 +93,8 @@ def augmentation_experiment(
         context=context,
         max_iterations=100000,
         max_training_time=max_training_time,
-        preload_training_data=False,
-        preload_validation_data=False,
+        preload_training_data=True,
+        preload_validation_data=True,
         num_workers=num_cpu_threads,
         validation_batch_size=16,
         logger=WandbLogger("dmri-hippo-seg-v3", logging_path)
