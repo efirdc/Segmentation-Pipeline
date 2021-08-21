@@ -30,7 +30,7 @@ def main(task_count, task_id, cpus_per_job, slurm_tmpdir):
     for items in cart_product:
         configs.append(dict(zip(params.keys(), items)))
 
-    # match task_id to congigs to run
+    # match task_id to configs to run
     current_job_configs = []
     for i in range(len(configs)):
         if i % task_count == task_id:
