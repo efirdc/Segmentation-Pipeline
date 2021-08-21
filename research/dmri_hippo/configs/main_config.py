@@ -22,6 +22,7 @@ def get_context(
 ):
     context = TorchContext(device, name="dmri-hippo", variables=variables)
     context.file_paths.append(os.path.abspath(__file__))
+    context.config.update({'fold': fold})
 
     input_images = ["mean_dwi", "md", "fa"]
     output_labels = ["whole_roi", "hbt_roi"]
