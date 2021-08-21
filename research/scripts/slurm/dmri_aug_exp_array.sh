@@ -9,8 +9,8 @@
 
 nvidia-smi
 
-module load python/3.7
-source ~/ENV/bin/activate
+module load python/3.8
+source ~/ENV_new/bin/activate
 
 export MPLBACKEND=agg
 
