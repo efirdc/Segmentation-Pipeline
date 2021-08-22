@@ -77,6 +77,7 @@ def augmentation_experiment(
         max_training_time: str = None,
         device: str = 'cuda',
         num_cpu_threads: int = 4,
+        group_name: str = None,
 ):
     dataset_path = prepare_dataset_files(dataset_path, work_path)
     context = augmentation.get_context(
@@ -97,7 +98,7 @@ def augmentation_experiment(
         preload_validation_data=True,
         num_workers=num_cpu_threads,
         validation_batch_size=16,
-        logger=WandbLogger("dmri-hippo-seg-v3", logging_path)
+        logger=WandbLogger("dmri-hippo-seg-v3", logging_path, group_name=group_name)
     )
 
 
