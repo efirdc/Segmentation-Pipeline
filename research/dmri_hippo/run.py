@@ -1,3 +1,5 @@
+from itertools import product
+
 import torch
 import fire
 
@@ -102,9 +104,39 @@ def augmentation_experiment(
     )
 
 
+def augmentation_experiment_grid(
+        dataset_path: str,
+        logging_path: str,
+        work_path: str = None,
+        task_id: int = 0,
+):
+    grid_params = {
+        "augmentation_mode": ["no_augmentation", "standard", "dwi_reconstruction", "combined"],
+        "fold": range(0, 5)
+    }
+
+    configs = [
+        dict(zip(grid_params.keys(), values))
+        for values in product(*grid_params.values())
+    ]
+    config = configs[task_id]
+
+    augmentation_experiment(
+        dataset_path=dataset_path,
+        logging_path=logging_path,
+        work_path=work_path,
+        **config,
+        max_training_time=None,
+        device='cuda',
+        num_cpu_threads=8,
+        group_name="augmentation_experiment_03",
+    )
+
+
 if __name__ == "__main__":
     fire.Fire({
         "main": main,
         "debug": debug,
         "augmentation_experiment": augmentation_experiment,
+        "augmentation_experiment_grid": augmentation_experiment_grid
     })
