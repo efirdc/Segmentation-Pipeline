@@ -1,0 +1,288 @@
+
+(ENV_new) [efirdc@cdr352 scratch]$ nnUNet_find_best_configuration -m 2d 3d_fullres -t 501
+
+
+Please cite the following paper when using nnUNet:
+
+Isensee, F., Jaeger, P.F., Kohl, S.A.A. et al. "nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation." Nat Methods (2020). https://doi.org/10.1038/s41592-020-01008-z
+
+
+If you have questions or suggestions, feel free to open an issue at https://github.com/MIC-DKFZ/nnUNet
+
+running missing postprocessing for Task501_DMRI_Hippocampus_Whole and model 2d
+Foreground vs background
+before: 0.8897070284858601
+after:  0.4492593700524951
+1
+before: 0.8954648967543117
+after:  0.8976950382778603
+Removing all but the largest region for class 1 improved results!
+min_valid_object_sizes None
+2
+before: 0.8839491602174087
+after:  0.8867548046565575
+Removing all but the largest region for class 2 improved results!
+min_valid_object_sizes None
+done
+for which classes:
+[1, 2]
+min_object_sizes
+None
+done
+running missing postprocessing for Task501_DMRI_Hippocampus_Whole and model 3d_fullres
+Foreground vs background
+before: 0.8909653472081769
+after:  0.44791556632411217
+1
+before: 0.8964277039638247
+after:  0.9015158472315492
+Removing all but the largest region for class 1 improved results!
+min_valid_object_sizes None
+2
+before: 0.8855029904525291
+after:  0.8868353596634182
+Removing all but the largest region for class 2 improved results!
+min_valid_object_sizes None
+done
+for which classes:
+[1, 2]
+min_object_sizes
+None
+done
+
+I will now ensemble combinations of the following models:
+ ['2d', '3d_fullres']
+ensembling /scratch/efirdc/nnUNet_trained_models/nnUNet/2d/Task501_DMRI_Hippocampus_Whole/nnUNetTrainerV2__nnUNetPlansv2.1 /scratch/efirdc/nnUNet_trained_models/nnUNet/3d_fullres/Task501_DMRI_Hippocampus_Whole/nnUNetTrainerV2__nnUNetPlansv2.1
+
+Ensembling folders
+ /scratch/efirdc/nnUNet_trained_models/nnUNet/2d/Task501_DMRI_Hippocampus_Whole/nnUNetTrainerV2__nnUNetPlansv2.1
+ /scratch/efirdc/nnUNet_trained_models/nnUNet/3d_fullres/Task501_DMRI_Hippocampus_Whole/nnUNetTrainerV2__nnUNetPlansv2.1
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+force_separate_z: None interpolation order: 3
+no resampling necessary
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+force_separate_z: None interpolation order: 3
+no resampling necessary
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+force_separate_z: None interpolation order: 3
+no resampling necessary
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+force_separate_z: None interpolation order: 3
+no resampling necessary
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+force_separate_z: None interpolation order: 3
+no resampling necessary
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+force_separate_z: None interpolation order: 3
+no resampling necessary
+Foreground vs background
+before: 0.899944835666062
+after:  0.45290933370091657
+1
+before: 0.904761453533788
+after:  0.9059575756956342
+Removing all but the largest region for class 1 improved results!
+min_valid_object_sizes None
+2
+before: 0.895128217798336
+after:  0.8951699935885853
+Removing all but the largest region for class 2 improved results!
+min_valid_object_sizes None
+done
+for which classes:
+[1, 2]
+min_object_sizes
+None
+done
+2d 0.8897070284858601
+3d_fullres 0.8909653472081769
+ensemble_2d__nnUNetTrainerV2__nnUNetPlansv2.1--3d_fullres__nnUNetTrainerV2__nnUNetPlansv2.1 0.899944835666062
+Task501_DMRI_Hippocampus_Whole submit model ensemble_2d__nnUNetTrainerV2__nnUNetPlansv2.1--3d_fullres__nnUNetTrainerV2__nnUNetPlansv2.1 0.899944835666062
+
+Here is how you should predict test cases. Run in sequential order and replace all input and output folder names with your personalized ones
+
+nnUNet_predict -i FOLDER_WITH_TEST_CASES -o OUTPUT_FOLDER_MODEL1 -tr nnUNetTrainerV2 -ctr nnUNetTrainerV2CascadeFullRes -m 2d -p nnUNetPlansv2.1 -t Task501_DMRI_Hippocampus_Whole
+nnUNet_predict -i FOLDER_WITH_TEST_CASES -o OUTPUT_FOLDER_MODEL2 -tr nnUNetTrainerV2 -ctr nnUNetTrainerV2CascadeFullRes -m 3d_fullres -p nnUNetPlansv2.1 -t Task501_DMRI_Hippocampus_Whole
+nnUNet_ensemble -f OUTPUT_FOLDER_MODEL1 OUTPUT_FOLDER_MODEL2 -o OUTPUT_FOLDER -pp /scratch/efirdc/nnUNet_trained_models/nnUNet/ensembles/Task501_DMRI_Hippocampus_Whole/ensemble_2d__nnUNetTrainerV2__nnUNetPlansv2.1--3d_fullres__nnUNetTrainerV2__nnUNetPlansv2.1/postprocessing.json
