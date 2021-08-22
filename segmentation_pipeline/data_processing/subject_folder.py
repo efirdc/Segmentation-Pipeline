@@ -110,20 +110,29 @@ class SubjectFolder(Dataset):
             subject_filter = cohort
             self.set_subjects(subject_filter(self.all_subjects))
 
-    def set_transform(self, transform_name):
-        if self.transforms is None:
-            self.transform = None
-        if isinstance(self.transforms, tio.Transform):
-            self.transform = self.transforms
-        if isinstance(self.transforms, dict):
-            if transform_name in self.transforms:
-                self.transform = self.transforms[transform_name]
-            elif 'default' in self.transforms:
-                self.transform = self.transforms['default']
-            else:
-                self.transform = None
+    def set_transform(self, transform: Union[str, tio.Transform]):
+        if isinstance(transform, str):
+            transform_name = transform
 
-    def get_cohort_dataset(self, cohort: Union[str, SubjectFilter]):
+            if self.transforms is None:
+                self.transform = None
+            elif isinstance(self.transforms, tio.Transform):
+                self.transform = self.transforms
+            elif isinstance(self.transforms, dict):
+                if transform_name in self.transforms:
+                    self.transform = self.transforms[transform_name]
+                elif 'default' in self.transforms:
+                    self.transform = self.transforms['default']
+                else:
+                    self.transform = None
+
+        elif isinstance(transform, tio.Transform):
+            self.transform = transform
+
+        else:
+            raise ValueError()
+
+    def get_cohort_dataset(self, cohort: Union[str, SubjectFilter]) -> 'SubjectFolder':
         transforms = self.transforms
         if isinstance(cohort, str):
             subject_filter = self.cohorts[cohort]
