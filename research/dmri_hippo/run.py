@@ -1,3 +1,5 @@
+from itertools import product
+
 import torch
 import fire
 
@@ -64,7 +66,7 @@ def debug(
         preload_validation_data=False,
         num_workers=0,
         validation_batch_size=1,
-        logger=WandbLogger("dmri-hippo-seg-debugging", logging_path)
+        logger=WandbLogger("dmri-hippo-seg-v3", logging_path, group_name="debug")
     )
 
 
@@ -77,6 +79,7 @@ def augmentation_experiment(
         max_training_time: str = None,
         device: str = 'cuda',
         num_cpu_threads: int = 4,
+        group_name: str = None,
 ):
     dataset_path = prepare_dataset_files(dataset_path, work_path)
     context = augmentation.get_context(
@@ -97,7 +100,36 @@ def augmentation_experiment(
         preload_validation_data=True,
         num_workers=num_cpu_threads,
         validation_batch_size=16,
-        logger=WandbLogger("dmri-hippo-seg-v3", logging_path)
+        logger=WandbLogger("dmri-hippo-seg-v3", logging_path, group_name=group_name)
+    )
+
+
+def augmentation_experiment_grid(
+        dataset_path: str,
+        logging_path: str,
+        work_path: str = None,
+        task_id: int = 0,
+):
+    grid_params = {
+        "augmentation_mode": ["no_augmentation", "standard", "dwi_reconstruction", "combined"],
+        "fold": range(0, 5)
+    }
+
+    configs = [
+        dict(zip(grid_params.keys(), values))
+        for values in product(*grid_params.values())
+    ]
+    config = configs[task_id]
+
+    augmentation_experiment(
+        dataset_path=dataset_path,
+        logging_path=logging_path,
+        work_path=work_path,
+        **config,
+        max_training_time=None,
+        device='cuda',
+        num_cpu_threads=8,
+        group_name="augmentation_experiment_03",
     )
 
 
@@ -106,4 +138,5 @@ if __name__ == "__main__":
         "main": main,
         "debug": debug,
         "augmentation_experiment": augmentation_experiment,
+        "augmentation_experiment_grid": augmentation_experiment_grid
     })

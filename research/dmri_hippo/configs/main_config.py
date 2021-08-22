@@ -145,7 +145,7 @@ def get_context(
                                                         stats_to_output=('volume', 'error', 'absolute_error', 'squared_error', 'percent_diff')),
                             log_name="predicted_label_eval",
                             cohorts=['cbbrain_validation', 'ab300_validation'],
-                            interval=250),
+                            interval=50),
         ScheduledEvaluation(evaluator=SegmentationEvaluator("y_pred_eval", "y_eval"),
                             log_name="segmentation_eval",
                             cohorts=['cbbrain_validation'],

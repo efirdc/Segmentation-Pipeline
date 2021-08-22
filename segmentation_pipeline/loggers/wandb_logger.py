@@ -84,6 +84,10 @@ class WandbLogger(Logger):
         wandb_params['dir'] = self.save_folder
         wandb.init(**wandb_params)
 
+        wandb.define_metric("*", summary="max")
+        wandb.define_metric("*", summary="min")
+        wandb.define_metric("*", summary="mean")
+
         # Save code on first iteration
         if not resuming_previous_run:
             for file_path in context.file_paths:
