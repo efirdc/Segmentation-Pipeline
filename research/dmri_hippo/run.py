@@ -66,7 +66,7 @@ def debug(
         preload_validation_data=False,
         num_workers=0,
         validation_batch_size=1,
-        logger=WandbLogger("dmri-hippo-seg-debugging", logging_path)
+        logger=WandbLogger("dmri-hippo-seg-v3", logging_path, group_name="debug")
     )
 
 
