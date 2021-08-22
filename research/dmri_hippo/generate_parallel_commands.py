@@ -41,7 +41,6 @@ def main(task_count, task_id, cpus_per_job, slurm_tmpdir):
     for i in range(cpus_per_job):
         cpu_list[i % len(current_job_configs)] += 1
 
-
     for i, config in enumerate(current_job_configs):
 
         data_dir = Path(slurm_tmpdir) / f"{i}"
@@ -57,6 +56,7 @@ def main(task_count, task_id, cpus_per_job, slurm_tmpdir):
             "--max_training_time '0-8:0:0' "
             f"--num_cpu_threads {cpu_list[i]} "
             f"--fold {config['fold']} "
+            "--group_name augmentation_experiment_01"
         )
 
 
