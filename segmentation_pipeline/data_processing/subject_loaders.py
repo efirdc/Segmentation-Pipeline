@@ -148,6 +148,15 @@ class ImageLoader(SubjectLoader):
             new_image = copy.deepcopy(new_image)
         subject_data[self.image_name] = new_image
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state['cached_image'] = None
+        return state
+
+    def __setstate__(self, state):
+        state['cached_image'] = None
+        self.__dict__.update(state)
+
 
 class ComposeLoaders(SubjectLoader):
     """ Composes a sequence of `SubjectLoader`s together.
