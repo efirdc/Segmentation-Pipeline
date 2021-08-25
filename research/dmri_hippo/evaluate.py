@@ -17,6 +17,7 @@ from segmentation_pipeline.data_processing.subject_loaders import AttributeLoade
 from segmentation_pipeline.evaluators.label_map_evaluator import LabelMapEvaluator
 from segmentation_pipeline.evaluators.labeled_tensor import LabeledTensor
 from segmentation_pipeline.evaluators.segmentation_evaluator import SegmentationEvaluator
+from segmentation_pipeline.loggers.wandb_logger import to_wandb
 from segmentation_pipeline.segmentation_trainer import ScheduledEvaluation
 
 
@@ -59,9 +60,7 @@ def get_cohorts(cohort_mode):
 
     cohorts = dict()
     if cohort_mode == "test":
-        cohorts["cbbrain_test"] = ComposeFilters(
-            [RequireAttributes({"protocol": "cbbrain", "rescan_id": "None"}), RequireAttributes(["fold"])]
-        )
+        cohorts["cbbrain_test"] = RequireAttributes({"protocol": "cbbrain", "rescan_id": "None", 'cbbrain_test': True})
         cohorts["ab300_test"] = ComposeFilters(
             [
                 RequireAttributes({"protocol": "ab300", "rescan_id": "None"}),
@@ -71,6 +70,13 @@ def get_cohorts(cohort_mode):
         )
         cohorts["rescans"] = ForbidAttributes({"rescan_id": "None"})
 
+        cohorts["ab300_unlabeled"] = ComposeFilters(
+            [
+                RequireAttributes({"protocol": "ab300", "rescan_id": "None"}),
+                ForbidAttributes({"ab300_validation": True}),
+                ForbidAttributes(["y"]),
+            ]
+        )
     elif cohort_mode == "validation":
         cohorts["cbbrain_validation"] = ComposeFilters(
             [RequireAttributes({"protocol": "cbbrain"}), RequireAttributes(["fold"])]
@@ -127,7 +133,7 @@ def main(ground_truth_path: str, predictions_path: str, project: str, group: str
                 stats_to_output=("volume", "error", "absolute_error", "squared_error", "percent_diff"),
             ),
             log_name="predicted_label_eval",
-            cohorts=["cbbrain_validation", "ab300_validation", "cbbrain_test", "ab300_test"],
+            cohorts=["cbbrain_validation", "ab300_validation", "cbbrain_test", "ab300_test", "ab300_unlabeled"],
         ),
         ScheduledEvaluation(
             evaluator=SegmentationEvaluator("y_pred", "y"),
@@ -155,24 +161,26 @@ def main(ground_truth_path: str, predictions_path: str, project: str, group: str
                 subjects_eval = [subject for subject in cohort_subjects if "y_pred" in subject]
 
                 if len(cohort_subjects) > len(subjects_eval):
-                    warnings.warn("Some subjects in cohort are missing predictions", RuntimeWarning)
+                    warnings.warn("Some subjects in cohort '{cohort}' are missing predictions", RuntimeWarning)
 
                 if len(subjects_eval) > 0:
                     results = scheduled_evaluator.evaluator(subjects_eval)
                     log_data[f"{scheduled_evaluator.log_name}/{cohort}"] = results
 
         run.log(to_flat_wandb(log_data))
+        run.log(to_wandb(log_data))
         run.finish()
 
         for subject in subjects:
-            del subject["y_pred"]
+            if 'y_pred' in subject:
+                del subject["y_pred"]
 
 
 if __name__ == "__main__":
     main(
-        ground_truth_path="/Volumes/Extra Files/Diffusion_MRI/",
-        predictions_path="/Volumes/Extra Files/nnUnetPredictions/nnUNet",
-        project="hippo-validation-eval",
-        group="run1",
-        cohort_mode="validation",
+        ground_truth_path="/Volumes/Extra Files/Diffusion_MRI_cropped",
+        predictions_path="/Volumes/Extra Files/Predictions/EnsembleFolds",
+        project="dmri-test-eval",
+        group="ensembled",
+        cohort_mode="test",
     )
