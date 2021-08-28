@@ -48,15 +48,15 @@ class EnsembleModels(nn.Module):
 
 
 class EnsembleFlips(nn.Module):
-    def __init__(self, model: nn.Module, strategy: str = 'mean'):
+    def __init__(self, model: nn.Module, strategy: str = 'mean', spatial_dims: Sequence[int] = (2, 3, 4)):
         super().__init__()
         self.model = model
         self.strategy = parse_strategy(strategy)
+        self.spatial_dims = spatial_dims
 
-        spatial_dims = (2, 3, 4)
         self.flips = []
-        for order in range(len(spatial_dims) + 1):
-            self.flips += list(itertools.combinations(spatial_dims, order))
+        for order in range(len(self.spatial_dims) + 1):
+            self.flips += list(itertools.combinations(self.spatial_dims, order))
 
     def forward(self, x):
         predictions = []

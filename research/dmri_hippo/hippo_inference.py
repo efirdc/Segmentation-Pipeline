@@ -17,6 +17,8 @@ def inference(dataloader, predictor, model, device):
 
     out_subjets = []
     for subjects in dataloader:
+        subject_names =  [subject['name'] for subject in subjects]
+        print(f"running inference for subjects: {subject_names}")
 
         with torch.no_grad():
             subjects, _ = predictor.predict(model=model, device=device, subjects=subjects)
@@ -64,20 +66,20 @@ def save_subjects_predictions(subjects, out_folder, output_filename):
     for subject in subjects:
 
         if out_folder == "":
-            out_folder = Path(subject["folder"])
+            out_folder_path = Path(subject["folder"])
         else:
-            out_folder = Path(out_folder) / "subjects" / subject["name"]
+            out_folder_path = Path(out_folder) / "subjects" / subject["name"]
 
-        out_folder.mkdir(exist_ok=True, parents=True)
+        out_folder_path.mkdir(exist_ok=True, parents=True)
 
-        subject["y_pred"].save(out_folder / (output_filename + ".nii.gz"))
+        subject["y_pred"].save(out_folder_path / (output_filename + ".nii.gz"))
 
 
 def post_process_subjects(subjects, image_name):
     txt_output = ""
     for subject in subjects:
         txt_output += subject["name"] + "\n"
-        txt_output += post_process(subject[image_name])
+        txt_output += post_process(subject[image_name]) + "\n"
 
     return txt_output
 
@@ -130,7 +132,7 @@ def main(
         context.init_components()
 
         if ensemble_flips:
-            context.model = EnsembleFlips(context.model, strategy="majority")
+            context.model = EnsembleFlips(context.model, strategy="majority", spatial_dims=(3, 4))
 
         contexts.append(context)
     print("Loaded models.")
@@ -139,6 +141,8 @@ def main(
         context = contexts[0]
         models = [context.model for context in contexts]
         context.model = EnsembleModels(models, strategy="majority")
+        names = [context.name for context in contexts]
+        context.name = names
         contexts = [context]
 
     for i, context in enumerate(contexts):
@@ -152,11 +156,19 @@ def main(
         )
         subjects = inference(dataloader, context.trainer.validation_predictor, context.model, device)
 
-        txt_output = post_process_subjects(subjects, "y_pred")
-        print(txt_output)
         base_file_name = generate_file_name(context, output_filename)
 
-        with open(Path(out_folder) / (base_file_name + ".txt"), "w") as f:
+        save_subjects_predictions(subjects, out_folder, base_file_name + "_before_processing")
+
+        txt_output = post_process_subjects(subjects, "y_pred")
+        print(txt_output)
+
+
+        if output_filename is None:
+            mode = "w"
+        else:
+            mode = "a"
+        with open(Path(out_folder) / (base_file_name + ".txt"), mode) as f:
             f.write(txt_output)
 
         save_subjects_predictions(subjects, out_folder, base_file_name)
