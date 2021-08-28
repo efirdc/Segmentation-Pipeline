@@ -24,8 +24,7 @@ def save_dataset_as_nn_unet(
         metadata: dict = None,
         output_folds: bool = False,
         num_folds: int = None,
-        save_cv_images: bool = True,
-        save_test_images: bool = True,
+        image_names_to_save: Optional[Sequence[str]] = None,
 ):
     """
     Convert dataset to nnUNet format, see:
@@ -42,13 +41,13 @@ def save_dataset_as_nn_unet(
         if not os.path.exists(folder):
             os.makedirs(folder)
 
-    def save_images(image_path, subject_id, subject, subject_name_cache, save_images=True, save_label_map=False):
+    def save_images(image_path, subject_id, subject, subject_name_cache, save_label_map=False):
         assert all(image_name in subject for image_name in image_names)
 
         new_subject_name = f'{short_name}_{subject_id:03}'
         subject_name_cache[subject['name']] = new_subject_name
 
-        if not save_images:
+        if image_names_to_save is not None and subject['name'] not in image_names_to_save:
             return
 
         channel_id = 0
@@ -79,15 +78,13 @@ def save_dataset_as_nn_unet(
 
     cv_subject_names = {}
     for subject in cross_validation_dataset:
-        save_images(train_image_path, subject_id, subject, cv_subject_names, save_images=save_cv_images,
-                    save_label_map=True)
+        save_images(train_image_path, subject_id, subject, cv_subject_names, save_label_map=True)
         subject_id += 1
 
     test_subject_names = {}
     if test_dataset is not None:
         for subject in test_dataset:
-            save_images(test_image_path, subject_id, subject, test_subject_names, save_images=save_test_images,
-                        save_label_map=False)
+            save_images(test_image_path, subject_id, subject, test_subject_names, save_label_map=False)
             subject_id += 1
 
     label_values = cross_validation_dataset[0][label_map_name]['label_values']

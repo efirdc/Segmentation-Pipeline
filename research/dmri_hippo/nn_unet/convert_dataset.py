@@ -89,8 +89,7 @@ def main(
         test_dataset=test_dataset,
         output_folds=True,
         num_folds=5,
-        save_cv_images=True,
-        save_test_images=True,
+        image_names_to_save=None
     )
 
 
