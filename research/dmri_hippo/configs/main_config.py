@@ -36,6 +36,9 @@ def get_context(
         ImageLoader(glob_pattern="whole_roi.*", image_name="whole_roi", image_constructor=tio.LabelMap,
                     label_values={"left_whole": 1, "right_whole": 2}
                     ),
+        ImageLoader(glob_pattern="whole_roi_alt.*", image_name="whole_roi_alt", image_constructor=tio.LabelMap,
+                    label_values={"left_whole": 1, "right_whole": 2}
+                    ),
         ImageLoader(glob_pattern="hbt_roi.*", image_name="hbt_roi", image_constructor=tio.LabelMap,
                     label_values={"left_head": 1, "left_body": 2, "left_tail": 3, "right_head": 4, "right_body": 5,
                                  "right_tail": 6}
@@ -69,6 +72,7 @@ def get_context(
     cohorts['ab300'] = RequireAttributes({"protocol": "ab300"})
     cohorts['rescans'] = ForbidAttributes({"rescan_id": "None"})
     cohorts['fasd'] = RequireAttributes({"pathologies": "FASD"})
+    cohorts['inter_rater'] = RequireAttributes(["whole_roi_alt"])
 
     common_transforms_1 = tio.Compose([
         tio.CropOrPad((96, 88, 24), padding_mode='minimum', mask_name='whole_roi_union'),
