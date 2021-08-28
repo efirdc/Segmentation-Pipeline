@@ -4,6 +4,7 @@ import shutil
 import glob
 from typing import Optional, List, Union
 from six import string_types
+import time
 
 import wandb
 from wandb.sdk.lib import telemetry
@@ -39,6 +40,7 @@ class WandbLogger(Logger):
         logging_dir: Root directory for logging experiments. The current run will be logged in:
             logging_dir/project_name/wandb_run_name/
     """
+
     def __init__(
             self,
             project_name: str,
@@ -82,7 +84,14 @@ class WandbLogger(Logger):
             os.makedirs(self.save_folder)
 
         wandb_params['dir'] = self.save_folder
-        wandb.init(**wandb_params)
+
+        for i in range(100):
+            try:
+                wandb.init(**wandb_params)
+                break
+            except Exception as e:
+                print(f"wandb.init failed due to {e}\nRetrying in 10s...")
+                time.sleep(10)
 
         wandb.define_metric("*", summary="max")
         wandb.define_metric("*", summary="min")
