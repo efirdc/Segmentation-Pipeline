@@ -1,4 +1,6 @@
 from collections import OrderedDict
+from typing import Optional
+from numbers import Number
 
 import torch
 from torch import nn
@@ -148,5 +150,36 @@ class BlurConvTranspose3d(nn.ConvTranspose3d):
 
         weight = F.conv3d(weight, self.kernel, padding=1, groups=self.in_channels)
         x = F.conv_transpose3d(x, weight, **self.kwargs)
+
+        return x
+
+
+class StochasticMatrix(nn.Module):
+    """
+    Reshapes a tensor with shape (N, C * C, ...) to (N, C, C, ...) and applies softmax on dim=1
+    """
+    def __init__(
+            self,
+            channels: int,
+            diag_bias: Optional[Number] = None,
+    ):
+        super().__init__()
+        self.channels = channels
+        self.diag_bias = diag_bias
+
+    def forward(self, x):
+        N = x.shape[0]
+        C_squared = x.shape[1]
+        C = self.channels
+        spatial_shape = x.shape[2:]
+
+        if C_squared != (C * C):
+            raise RuntimeError("Expected dim 1 of input tensor to be the square of the number of out channels")
+
+        x = x.reshape(N, C, C, *spatial_shape)
+        if self.diag_bias is not None:
+            x = x + torch.eye(C, device=x.device).reshape(1, C, C, *(1 for dim in spatial_shape)) * self.diag_bias
+        x = torch.softmax(x, dim=1)
+        x = x.reshape(N, C_squared, *spatial_shape)
 
         return x

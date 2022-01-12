@@ -1,38 +1,36 @@
 import argparse
 import json
+import pathlib
 from pathlib import Path
 
 import torch
 import torchio as tio
 import fire
 
-from segmentation_pipeline.models.ensemble import EnsembleFlips, EnsembleModels
-from segmentation_pipeline.post_processing import keep_components, remove_holes
-from segmentation_pipeline.utils.torch_context import TorchContext
+from segmentation_pipeline import *
+
+# Hack so that models can load on windows
+pathlib.PosixPath = pathlib.Path
 
 
-def inference(dataloader, predictor, model, device):
-
+def inference(subjects, predictor, model, device):
     model.eval()
 
-    out_subjets = []
-    for subjects in dataloader:
-        subject_names =  [subject['name'] for subject in subjects]
-        print(f"running inference for subjects: {subject_names}")
+    subject_names = [subject['name'] for subject in subjects]
+    print(f"running inference for subjects: {subject_names}")
 
-        with torch.no_grad():
-            subjects, _ = predictor.predict(model=model, device=device, subjects=subjects)
+    with torch.no_grad():
+        subjects, _ = predictor.predict(model=model, device=device, subjects=subjects)
 
-        for subject in subjects:
-            transform = subject.get_composed_history()
-            inverse_transform = transform.inverse(warn=False)
-            pred_subject = tio.Subject({"y": subject["y_pred"]})
-            inverse_pred_subject = inverse_transform(pred_subject)
-            output_label = inverse_pred_subject.get_first_image()
-            subject["y_pred"].set_data(output_label["data"])
-            out_subjets.append(subject)
+    for subject in subjects:
+        transform = subject.get_composed_history()
+        inverse_transform = transform.inverse(warn=False)
+        pred_subject = tio.Subject({"y": subject["y_pred"]})
+        inverse_pred_subject = inverse_transform(pred_subject)
+        output_label = inverse_pred_subject.get_first_image()
+        subject["y_pred"].set_data(output_label["data"].to(torch.int32))
 
-    return out_subjets
+    return subjects
 
 
 def post_process(output_label):
@@ -62,7 +60,6 @@ def generate_file_name(context, output_name):
 
 
 def save_subjects_predictions(subjects, out_folder, output_filename):
-
     for subject in subjects:
 
         if out_folder == "":
@@ -87,6 +84,7 @@ def post_process_subjects(subjects, image_name):
 def main(
     ensemble_path: str,
     dataset_path: str,
+    run_name: str,
     output_filename: str = None,
     out_folder: str = "",
     device: str = "cpu",
@@ -101,6 +99,7 @@ def main(
     Args:
         ensemble_path: Folder with models
         dataset_path: Path to the subjects data folders.
+        run_name:
         output_filename: File name for segmentation output. Provided extensions will be ignored and file will be saved ass .nii.gz.
             If output_filename is not provided the context name is used.
         out_folder: Folder for output.
@@ -113,6 +112,7 @@ def main(
         batch_size: How many subjects should be run through the model at once.
     """
     input_args = locals().copy()
+    input_args['cohort'] = str(input_args['cohort'])
 
     if device.startswith("cuda"):
         if torch.cuda.is_available():
@@ -150,37 +150,39 @@ def main(
             dataset = context.dataset
         else:
             dataset = context.dataset.get_cohort_dataset(cohort)
-        print(f"Running inference for context {i}")
+        print(f"Running inference for context {context.name}")
+
         dataloader = context.trainer.validation_dataloader_factory.get_data_loader(
             dataset=dataset, batch_size=batch_size, num_workers=num_workers
         )
-        subjects = inference(dataloader, context.trainer.validation_predictor, context.model, device)
 
-        base_file_name = generate_file_name(context, output_filename)
+        for subjects in dataloader:
+            subjects = inference(subjects, context.trainer.validation_predictor, context.model, device)
 
-        save_subjects_predictions(subjects, out_folder, base_file_name + "_before_processing")
+            base_file_name = generate_file_name(context, output_filename)
 
-        txt_output = post_process_subjects(subjects, "y_pred")
-        print(txt_output)
+            save_subjects_predictions(subjects, out_folder, base_file_name + "_before_processing")
 
+            txt_output = post_process_subjects(subjects, "y_pred")
+            print(txt_output)
 
-        if output_filename is None:
-            mode = "w"
-        else:
-            mode = "a"
-        with open(Path(out_folder) / (base_file_name + ".txt"), mode) as f:
-            f.write(txt_output)
+            if output_filename is None:
+                mode = "w"
+            else:
+                mode = "a"
+            with open(Path(out_folder) / (base_file_name + ".txt"), mode) as f:
+                f.write(txt_output)
 
-        save_subjects_predictions(subjects, out_folder, base_file_name)
+            save_subjects_predictions(subjects, out_folder, base_file_name)
 
-        with open(Path(out_folder) / (base_file_name + ".json"), "w") as f:
-            inference_settings = dict()
-            inference_settings.update(input_args)
-            inference_settings["context_name"] = context.name
-            inference_settings["output_filename"] = base_file_name + ".nii.gz"
-            json.dump(inference_settings, f, indent=4)
+    base_file_name = generate_file_name(context, output_filename)
+    with open(Path(out_folder) / (run_name + ".json"), "w") as f:
+        inference_settings = dict()
+        inference_settings.update(input_args)
+        inference_settings["context_name"] = [context.name for context in contexts]
+        inference_settings["output_filename"] = base_file_name + ".nii.gz"
+        json.dump(inference_settings, f, indent=4)
 
 
 if __name__ == "__main__":
-    
     fire.Fire(main)

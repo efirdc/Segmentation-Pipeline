@@ -13,6 +13,31 @@ from .transforms import *
 from .utils import Config, collate_subjects, no_op
 
 
+def split_and_flip(x: torch.Tensor) -> torch.Tensor:
+    x_split = list(x.split(x.shape[2] // 2, dim=2))
+    x_split[1] = x_split[1].flip(2)
+    x = torch.cat(x_split, dim=0)
+    return x
+
+
+def reverse_split_and_flip(x: torch.Tensor) -> torch.Tensor:
+    x_split = list(x.split(x.shape[0] // 2, dim=0))
+    x_split[1] = x_split[1].flip(2)
+    x = torch.cat(x_split, dim=2)
+    return x
+
+
+def apply_stochastic_matrix(y_pred, y_prior):
+    N = y_prior.shape[0]
+    C = y_prior.shape[1]
+    spatial_shape = y_prior.shape[2:]
+
+    y_pred = y_pred.reshape(N, C, C, *spatial_shape)
+    y_pred = (y_pred * y_prior[:, None]).sum(dim=1)
+
+    return y_pred
+
+
 class Predictor(ABC, Config):
     """Representation to get model predictions"""
 
@@ -36,9 +61,14 @@ class StandardPredict(Predictor):
             self,
             image_names: Sequence[str] = ("X",),
             sagittal_split: bool = False,
+            refine_image: str = None,
     ):
+        image_names = list(image_names)
+        if refine_image is not None and refine_image not in image_names:
+            image_names.append(refine_image)
         self.image_names = image_names
         self.sagittal_split = sagittal_split
+        self.refine_image = refine_image
 
     def predict(self, model, device, subjects, label_attributes=None):
 
@@ -48,14 +78,18 @@ class StandardPredict(Predictor):
             label_attributes = {}
 
         if self.sagittal_split:
-            # apply split and flip on batch to reduce memory
-            split = self.split_and_flip(batch['X'])
-            out = model(split)
-            out = self.reverse_split_and_flip(out)
+            split = split_and_flip(batch['X'])
+            y_pred = model(split)
+            y_pred = reverse_split_and_flip(y_pred)
         else:
-            out = model(batch["X"])
+            y_pred = model(batch["X"])
 
-        batch['y_pred'] = out
+        #if self.refine_image is not None:
+        #    y_prior = batch[self.refine_image]
+        #    y_pred = apply_stochastic_matrix(y_pred, y_prior)
+        #    y_pred = (y_pred * y_prior[:, None]).sum(dim=1)
+
+        batch['y_pred'] = y_pred
 
         out_subjects = []
         for i in range(len(subjects)):
@@ -66,18 +100,6 @@ class StandardPredict(Predictor):
             out_subjects.append(subject)
 
         return out_subjects, batch
-
-    def split_and_flip(self, x: torch.Tensor) -> torch.Tensor:
-        x_split = list(x.split(x.shape[2] // 2, dim=2))
-        x_split[1] = x_split[1].flip(2)
-        x = torch.cat(x_split, dim=0)
-        return x
-
-    def reverse_split_and_flip(self, x: torch.Tensor) -> torch.Tensor:
-        x_split = list(x.split(x.shape[0] // 2, dim=0))
-        x_split[1] = x_split[1].flip(2)
-        x = torch.cat(x_split, dim=2)
-        return x
 
 
 class PatchPredict(Predictor):

@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from typing import Optional, Dict
 
 
 class NestedResUNet(nn.Module):
@@ -45,8 +46,19 @@ class NestedResUNet(nn.Module):
 
             return x
 
-    def __init__(self, input_channels, output_channels, filters, dropout_p=0.0):
+    def __init__(
+            self,
+            input_channels: int,
+            output_channels: int,
+            filters: int,
+            dropout_p: float = 0.0,
+            hypothesis_class: nn.Module = nn.Softmax,
+            hypothesis_params: Optional[Dict] = None,
+    ):
         super().__init__()
+
+        if hypothesis_params is None:
+            hypothesis_params = {"dim": 1}
 
         self.dropout = None
         if dropout_p != 0.0:
@@ -71,7 +83,7 @@ class NestedResUNet(nn.Module):
         self.conv0_3 = self.Block(filters*2, filters, **block_params, residual=True)
 
         self.out_conv = nn.Conv3d(filters, output_channels, kernel_size=3, padding=1)
-        self.hypothesis = nn.Softmax(dim=1)
+        self.hypothesis = hypothesis_class(**hypothesis_params)
 
     def forward(self, x):
 

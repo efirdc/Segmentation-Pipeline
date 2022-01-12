@@ -21,4 +21,3 @@ python -m research.dmri_hippo.run augmentation_experiment \
 --augmentation_mode "combined" \
 --max_training_time "0-8:0:0"  \
 --num_cpu_threads 8
-

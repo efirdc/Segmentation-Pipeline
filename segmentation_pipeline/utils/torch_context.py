@@ -8,6 +8,7 @@ import torch
 import dill
 
 from .config import get_nested_config
+from ..typing import PathLike
 
 
 class TorchContext:
@@ -55,7 +56,7 @@ class TorchContext:
             self,
             device: torch.device,
             name: str = None,
-            file_path: str = None,
+            file_path: PathLike = None,
             variables: Dict[str, str] = None,
             metadata: Dict[str, Any] = None
     ):
@@ -72,7 +73,12 @@ class TorchContext:
         self.config = {}
 
         if file_path is not None:
-            checkpoint = torch.load(file_path, map_location=torch.device(self.device))
+            #with open(file_path, 'rb') as file:
+                #checkpoint = dill.load(file,)
+            checkpoint = torch.load(file_path,
+                                    map_location=torch.device(self.device),
+                                    pickle_module=dill,
+                                    ignore=False,)
 
             self.name = checkpoint["name"]
             self.component_definitions = checkpoint['component_definitions']

@@ -1,11 +1,15 @@
+import copy
+import os
+import sys
+from pathlib import Path
+
 import torch
 import torchio as tio
-from torch.utils.data import DataLoader
 
-from segmentation_pipeline import load_module
+from segmentation_pipeline import *
+
 
 if __name__ == "__main__":
-    config = load_module("research/msseg2/msseg2.py")
 
     if torch.cuda.is_available():
         device = torch.device('cuda')
@@ -14,26 +18,10 @@ if __name__ == "__main__":
         device = torch.device('cpu')
         print("CUDA is not available. Using CPU.")
 
-    variables = dict(DATASET_PATH="X:/Datasets/MSSEG2_processed/", CHECKPOINTS_PATH="X:/Checkpoints/")
-    context = config.get_context(device, variables)
+    msseg_ensemble_02_path = Path("X:\\Checkpoints\\MSSEG2\\cross_validation_01\\ensemble_02\\")
+    msseg_fold_paths = list(msseg_ensemble_02_path.iterdir())
+
+    variables = dict(DATASET_PATH="X:/Datasets/MSSEG2_resampled/")
+    device = torch.device('cuda')
+    context = TorchContext(device, file_path=msseg_fold_paths[0], variables=variables)
     context.init_components()
-
-    patch_size = 96
-    queue_length = 300
-    samples_per_volume = 10
-
-    sampler = tio.data.UniformSampler(patch_size)
-    patches_queue = tio.Queue(
-        context.dataset,
-        queue_length,
-        samples_per_volume,
-        sampler,
-        num_workers=0,
-    )
-
-    patches_loader = DataLoader(dataset=patches_queue, batch_size=2, collate_fn=context.dataset.collate)
-
-    num_epochs = 2
-    for epoch_index in range(num_epochs):
-        for patches_batch in patches_loader:
-            print(patches_batch)

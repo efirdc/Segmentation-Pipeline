@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Sequence, Union
+import os
 from glob import glob
 from pathlib import Path
 import json
@@ -10,6 +11,14 @@ import numpy as np
 import torch
 
 from ..utils import auto_str, vargs_or_sequence
+
+
+def get_subject_file_paths(subject_data, glob_pattern):
+    os.environ["SUBJECT_NAME"] = subject_data['name']
+    glob_pattern = os.path.expandvars(glob_pattern)
+    path = os.path.join(subject_data['folder'], os.path.expandvars(glob_pattern))
+    matching_files = glob(path)
+    return matching_files
 
 
 class SubjectLoader(ABC):
@@ -61,8 +70,7 @@ class AttributeLoader(SubjectLoader):
         self.uniform_cache = {}
 
     def __call__(self, subject_data):
-        subject_folder = subject_data['folder']
-        matching_files = glob(f"{subject_folder}/{self.glob_pattern}")
+        matching_files = get_subject_file_paths(subject_data, self.glob_pattern)
 
         for matching_file in matching_files:
 
@@ -137,8 +145,7 @@ class ImageLoader(SubjectLoader):
             subject_data[self.image_name] = copy.deepcopy(self.cached_image)
             return
 
-        subject_folder = subject_data['folder']
-        matching_files = glob(f"{subject_folder}/{self.glob_pattern}")
+        matching_files = get_subject_file_paths(subject_data, self.glob_pattern)
         if len(matching_files) == 0:
             return
 
@@ -203,11 +210,10 @@ class TensorLoader(SubjectLoader):
         self.uniform_cache = {}
 
     def __call__(self, subject_data):
-        subject_folder = subject_data['folder']
-        matching_files = glob(f"{subject_folder}/{self.glob_pattern}")
+        matching_files = get_subject_file_paths(subject_data, self.glob_pattern)
 
         if len(matching_files) > 1:
-            raise RuntimeError(f"More than one {self.tensor_name} file found in {subject_folder}/{self.glob_pattern}")
+            raise RuntimeError(f"More than one {self.tensor_name} file matched the glob pattern {self.glob_pattern}")
 
         for matching_file in matching_files:
 
