@@ -1,5 +1,6 @@
 import copy
 from pathlib import Path
+from typing import Optional, Sequence
 
 import numpy as np
 import torch
@@ -11,32 +12,34 @@ from ..utils import CompactJSONEncoder
 
 def get_bounds(mask: torch.BoolTensor):
     where = np.where(mask)
-    bounds = []
-    for i, w in enumerate(where):
-        bounds.append(int(w.max()) - int(w.min()))
-    return bounds
-
-
-def get_crop(mask: torch.BoolTensor):
-    where = np.where(mask)
+    extents = []
     crop = []
+    size = []
+    center = []
+
     for i, w in enumerate(where):
-        crop += [int(w.min()), mask.shape[i] - int(w.max())]
-    return crop
+        w_min = int(w.min())
+        w_max = int(w.max())
+        extents += [w_min, w_max]
+        crop += [w_min, mask.shape[i] - w_max]
+        size.append(w_max - w_min)
+        center.append((w_max + w_min) / 2)
+
+    return {"extents": extents, "crop": crop, "size": size, "center": center}
 
 
-def get_label_crop(label_map: tio.LabelMap):
-    label_extents = {}
+def get_label_bounds(label_map: tio.LabelMap):
+    label_bounds = {}
     label_values = label_map['label_values']
 
     all_mask = (label_map.data != 0)
-    label_extents['all'] = get_crop(all_mask[0])
+    label_bounds['all'] = get_bounds(all_mask[0])
 
     for label_name, label_value in label_values.items():
         mask = (label_map.data == label_value)
-        label_extents[label_name] = get_crop(mask[0])
+        label_bounds[label_name] = get_bounds(mask[0])
 
-    return label_extents
+    return label_bounds
 
 
 def get_summary_stats(tensor: torch.Tensor, **kwargs):
@@ -85,7 +88,8 @@ def summarize(elem):
 def get_dataset_fingerprint(
         dataset: SubjectFolder,
         transform: tio.Transform = None,
-        save: bool = False
+        save: bool = False,
+        image_names: Optional[Sequence[str]] = None
 ):
     subject_fingerprints = {}
 
@@ -96,14 +100,20 @@ def get_dataset_fingerprint(
             subject.load()
             subject = transform(subject)
 
-        images = {key: val for key, val in subject.items() if isinstance(val, tio.ScalarImage)}
-        label_maps = {key: val for key, val in subject.items() if isinstance(val, tio.LabelMap)}
+        if image_names is None:
+            images = {key: val for key, val in subject.items() if isinstance(val, tio.ScalarImage)}
+            label_maps = {key: val for key, val in subject.items() if isinstance(val, tio.LabelMap)}
+        else:
+            images = {image_name: subject[image_name] for image_name in image_names
+                      if image_name in subject and isinstance(subject[image_name], tio.ScalarImage)}
+            label_maps = {image_name: subject[image_name] for image_name in image_names
+                          if image_name in subject and isinstance(subject[image_name], tio.LabelMap)}
 
         subject_fingerprints[subject['name']] = {
             'spacing': subject.spacing,
             'spatial_shape': subject.spatial_shape,
-            'label_crop': {name: get_label_crop(label_map)
-                           for name, label_map in label_maps.items()},
+            'label_bounds': {name: get_label_bounds(label_map)
+                             for name, label_map in label_maps.items()},
             'intensity_stats': {name: get_summary_stats(image.data)
                                 for name, image in images.items()}
         }

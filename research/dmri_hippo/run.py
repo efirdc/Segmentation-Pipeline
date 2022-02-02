@@ -5,7 +5,7 @@ import fire
 
 from segmentation_pipeline import prepare_dataset_files, SegmentationTrainer, WandbLogger
 
-from .configs import main_config, augmentation
+from .configs import main_config, augmentation, cascade
 
 
 def main(
@@ -133,10 +133,85 @@ def augmentation_experiment_grid(
     )
 
 
+def cascade_debug(
+        dataset_path: str,
+        predictions_path: str,
+        logging_path: str,
+        work_path: str = None,
+        prior_label_name: str = "standard",
+        fold: int = 0,
+        max_training_time: str = None,
+        device: str = 'cuda',
+        num_cpu_threads: int = 0,
+        group_name: str = "debug",
+):
+    dataset_path = prepare_dataset_files(dataset_path, work_path)
+    predictions_path = prepare_dataset_files(predictions_path, work_path)
+    context = cascade.get_context(
+        device=torch.device(device),
+        variables={"DATASET_PATH": str(dataset_path), "PREDICTIONS_PATH": str(predictions_path)},
+        prior_label_name=prior_label_name,
+        fold=fold,
+        predict_hbt=False,
+    )
+    context.init_components()
+
+    trainer: SegmentationTrainer = context.trainer
+    trainer.train(
+        context=context,
+        max_iterations=100000,
+        max_training_time=max_training_time,
+        preload_training_data=False,
+        preload_validation_data=False,
+        num_workers=num_cpu_threads,
+        validation_batch_size=16,
+        logger=WandbLogger("dmri-hippo-seg-v3", logging_path, group_name=group_name)
+    )
+
+
+def cascade_experiment(
+        dataset_path: str,
+        predictions_path: str,
+        logging_path: str,
+        work_path: str = None,
+        prior_label_name: str = "standard",
+        model_type=None,
+        fold: int = 0,
+        max_training_time: str = None,
+        device: str = 'cuda',
+        num_cpu_threads: int = 0,
+        group_name: str = None,
+):
+    dataset_path = prepare_dataset_files(dataset_path, work_path)
+    predictions_path = prepare_dataset_files(predictions_path, work_path)
+    context = cascade.get_context(
+        device=torch.device(device),
+        variables={"DATASET_PATH": str(dataset_path), "PREDICTIONS_PATH": str(predictions_path)},
+        prior_label_name=prior_label_name,
+        fold=fold,
+        predict_hbt=False,
+        model_type=model_type,
+    )
+    context.init_components()
+
+    trainer: SegmentationTrainer = context.trainer
+    trainer.train(
+        context=context,
+        max_iterations=100000,
+        max_training_time=max_training_time,
+        preload_training_data=True,
+        preload_validation_data=True,
+        num_workers=num_cpu_threads,
+        validation_batch_size=16,
+        logger=WandbLogger("dmri-hippo-seg-v3", logging_path, group_name=group_name)
+    )
+
+
 if __name__ == "__main__":
     fire.Fire({
         "main": main,
         "debug": debug,
         "augmentation_experiment": augmentation_experiment,
-        "augmentation_experiment_grid": augmentation_experiment_grid
+        "augmentation_experiment_grid": augmentation_experiment_grid,
+        "cascade_experiment": cascade_experiment,
     })

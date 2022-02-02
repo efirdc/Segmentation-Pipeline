@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --array=3
+#SBATCH --array=2
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node 1
 #SBATCH --cpus-per-task 8
 #SBATCH --gres=gpu:v100l:1
 #SBATCH --mem=32G
-#SBATCH --time=1-0:0:0
+#SBATCH --time=0-3:0:0
 #SBATCH --account=def-uofavis-ab
 
 TASK_NAME=Task502_DMRI_Hippocampus_Whole_Split

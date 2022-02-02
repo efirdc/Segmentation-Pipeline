@@ -159,6 +159,7 @@ def prepare_dataset_files(
             extract_dir = dataset_path.parent
         else:
             extract_dir = Path(work_path)
+        extract_dir.mkdir(exist_ok=True, parents=True)
         extract_dir_contents = [child.stem for child in list(extract_dir.iterdir())]
         with tarfile.open(name=dataset_path, mode="r") as tar:
             first_tar_file = tar.getnames()[0]

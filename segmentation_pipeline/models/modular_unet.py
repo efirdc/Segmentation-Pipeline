@@ -84,7 +84,6 @@ class ModularUNet(nn.Module):
         self.hypothesis = hypothesis_class(**hypothesis_params)
 
     def forward(self, x):
-
         down_block_output = []
         for i in range(self.depth):
             x = self.down_blocks[i](x)

@@ -14,4 +14,4 @@ source ~/ENV_new/bin/activate
 
 export MPLBACKEND=agg
 
-python research/dmri_hippo/generate_parallel_commands.py | parallel --jobs 3 
+python research/dmri_hippo/generate_parallel_commands.py | parallel --jobs 3

@@ -135,7 +135,7 @@ def get_context(device, variables, fold=0, **kwargs):
 
         return score
 
-    train_predictor = StandardPredict(device, image_names=['X', 'y'])
+    train_predictor = StandardPredict(image_names=['X', 'y'])
     validation_predictor = PatchPredict(
         patch_batch_size=32,
         patch_size=config['patch_size'], 

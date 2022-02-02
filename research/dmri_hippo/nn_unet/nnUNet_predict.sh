@@ -3,7 +3,7 @@
 module load python/3.8
 source ~/ENV_new/bin/activate
 
-TASK_NAME="Task501_DMRI_Hippocampus_Whole"
+TASK_NAME="Task502_DMRI_Hippocampus_Whole_Split"
 FOLDER_WITH_TEST_CASES="${nnUNet_raw_data_base}/nnUNet_raw_data/${TASK_NAME}/imagesTs/"
 
 OUTPUT_NAME="predictionsTs"

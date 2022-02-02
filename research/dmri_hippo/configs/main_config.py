@@ -31,9 +31,12 @@ def get_context(
         ImageLoader(glob_pattern="mean_dwi.*", image_name='mean_dwi', image_constructor=tio.ScalarImage),
         ImageLoader(glob_pattern="md.*", image_name='md', image_constructor=tio.ScalarImage),
         ImageLoader(glob_pattern="fa.*", image_name='fa', image_constructor=tio.ScalarImage),
-        ImageLoader(glob_pattern="full_dwi.*", image_name='full_dwi', image_constructor=tio.ScalarImage),
-        TensorLoader(glob_pattern="full_dwi_grad.b", tensor_name="grad", belongs_to="full_dwi"),
+        # ImageLoader(glob_pattern="full_dwi.*", image_name='full_dwi', image_constructor=tio.ScalarImage),
+        # TensorLoader(glob_pattern="full_dwi_grad.b", tensor_name="grad", belongs_to="full_dwi"),
         ImageLoader(glob_pattern="whole_roi.*", image_name="whole_roi", image_constructor=tio.LabelMap,
+                    label_values={"left_whole": 1, "right_whole": 2}
+                    ),
+        ImageLoader(glob_pattern="whole_roi_alt.*", image_name="whole_roi_alt", image_constructor=tio.LabelMap,
                     label_values={"left_whole": 1, "right_whole": 2}
                     ),
         ImageLoader(glob_pattern="hbt_roi.*", image_name="hbt_roi", image_constructor=tio.LabelMap,
@@ -69,12 +72,13 @@ def get_context(
     cohorts['ab300'] = RequireAttributes({"protocol": "ab300"})
     cohorts['rescans'] = ForbidAttributes({"rescan_id": "None"})
     cohorts['fasd'] = RequireAttributes({"pathologies": "FASD"})
+    cohorts['inter_rater'] = RequireAttributes(["whole_roi_alt"])
 
     common_transforms_1 = tio.Compose([
         tio.CropOrPad((96, 88, 24), padding_mode='minimum', mask_name='whole_roi_union'),
-        CustomRemapLabels(remapping=[("right_whole", 2, 1)], masking_method="Right", include="whole_roi"),
+        CustomRemapLabels(remapping=[("right_whole", 2, 1)], masking_method="Right", include=["whole_roi"]),
         CustomRemapLabels(remapping=[("right_head", 4, 1), ("right_body", 5, 2), ("right_tail", 6, 3)],
-                          masking_method="Right", include="hbt_roi"),
+                          masking_method="Right", include=["hbt_roi"]),
     ])
 
     noise = tio.RandomNoise(std=0.035, p=0.3)
@@ -82,7 +86,7 @@ def get_context(
     standard_augmentations = tio.Compose([
         tio.RandomFlip(axes=(0, 1, 2)),
         tio.RandomElasticDeformation(p=0.5, num_control_points=(7, 7, 4), locked_borders=1,
-                                     image_interpolation='bspline', exclude="full_dwi"),
+                                     image_interpolation='bspline', exclude=["full_dwi"]),
         tio.RandomBiasField(p=0.5),
         tio.RescaleIntensity((0, 1), (0.01, 99.9)),
         tio.RandomGamma(p=0.8),
@@ -92,13 +96,12 @@ def get_context(
             tio.Compose([noise, blur]),
         ])
     ], exclude="full_dwi")
-    dwi_augmentation = ReconstructMeanDWI(num_dwis=(1, 25), num_directions=(1, 3), directionality=(4, 10))
 
     common_transforms_2 = tio.Compose([
         tio.RescaleIntensity((-1., 1.), (0.5, 99.5)),
         ConcatenateImages(image_names=["mean_dwi", "md", "fa"], image_channels=[1, 1, 1], new_image_name="X"),
         RenameProperty(old_name="hbt_roi" if predict_hbt else "whole_roi", new_name="y"),
-        CustomOneHot(include="y")
+        CustomOneHot(include=["y"])
     ])
 
     transforms = {
@@ -108,7 +111,7 @@ def get_context(
         ]),
         'training': tio.Compose([
             common_transforms_1,
-            tio.Compose([dwi_augmentation, standard_augmentations]),
+            standard_augmentations,
             common_transforms_2
         ]),
     }
@@ -130,7 +133,7 @@ def get_context(
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Axial", 'mean_dwi', 'y_pred_eval', 'y_eval',
                                                             slice_id=12, legend=True, ncol=2, split_subjects=False),
                             log_name=f"contour_image_training",
-                            interval=10),
+                            interval=50),
     ]
 
     curve_params = {
@@ -154,12 +157,12 @@ def get_context(
                                                             slice_id=10, legend=True, ncol=5, split_subjects=False),
                             log_name="contour_image_axial",
                             cohorts=['cbbrain_validation', 'ab300_validation_plot'],
-                            interval=50),
+                            interval=250),
         ScheduledEvaluation(evaluator=ContourImageEvaluator("Coronal", "mean_dwi", "y_pred_eval", "y_eval",
                                                             slice_id=44, legend=True, ncol=2, split_subjects=False),
                             log_name="contour_image_coronal",
                             cohorts=['cbbrain_validation', 'ab300_validation_plot'],
-                            interval=50),
+                            interval=250),
     ]
 
     def scoring_function(evaluation_dict):
