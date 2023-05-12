@@ -6,6 +6,7 @@ from torch.utils.data.sampler import RandomSampler, SequentialSampler
 import torchio as tio
 
 from segmentation_pipeline import *
+from segmentation_pipeline.transforms.replace_nan import ReplaceNan
 
 
 old_validation_split = [f"cbbrain_{subject_id:03}" for subject_id in (
@@ -75,6 +76,7 @@ def get_context(
     cohorts['inter_rater'] = RequireAttributes(["whole_roi_alt"])
 
     common_transforms_1 = tio.Compose([
+        ReplaceNan(),
         tio.CropOrPad((96, 88, 24), padding_mode='minimum', mask_name='whole_roi_union'),
         CustomRemapLabels(remapping=[("right_whole", 2, 1)], masking_method="Right", include=["whole_roi"]),
         CustomRemapLabels(remapping=[("right_head", 4, 1), ("right_body", 5, 2), ("right_tail", 6, 3)],
@@ -117,7 +119,7 @@ def get_context(
     }
 
     context.add_component("dataset", SubjectFolder, root='$DATASET_PATH', subject_path="subjects",
-                          subject_loader=subject_loader, cohorts=cohorts, transforms=transforms)
+                          subject_loader=subject_loader, cohorts=cohorts, transforms=transforms, ref_img='mean_dwi')
     context.add_component("model", NestedResUNet,
                           input_channels=3,
                           output_channels=4 if predict_hbt else 2,

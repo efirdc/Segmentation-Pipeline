@@ -38,12 +38,14 @@ class SubjectFolder(Dataset):
             subject_loader: SubjectLoader,
             cohorts: Dict[str, SubjectFilter] = None,
             transforms: Union[tio.Transform, Dict[str, tio.Transform]] = None,
+            ref_img = None
     ):
         self.root = root
         self.subject_path = os.path.join(self.root, subject_path)
         self.subject_loader = subject_loader
         self.cohorts = {} if cohorts is None else cohorts
         self.transforms = transforms
+        self.ref_img = ref_img
 
         self._preloaded = False
         self._pretransformed = False
@@ -63,8 +65,12 @@ class SubjectFolder(Dataset):
             # torchio doesn't like to load a subject with no images
             if not any(isinstance(v, tio.Image) for v in subject_data.values()):
                 continue
-
-            subjects.append(tio.Subject(**subject_data))
+            
+            subject = tio.Subject(**subject_data)
+            if self.ref_img:
+                transform = tio.CopyAffine(self.ref_img)
+                subject = transform(subject)
+            subjects.append(subject)
 
         if "all" in self.cohorts:
             all_filter = self.cohorts['all']
@@ -152,7 +158,7 @@ class SubjectFolder(Dataset):
         else:
             cohorts['all'] = subject_filter
 
-        return SubjectFolder(self.root, self.subject_path, self.subject_loader, cohorts, transforms)
+        return SubjectFolder(self.root, self.subject_path, self.subject_loader, cohorts, transforms, ref_img=self.ref_img)
 
     def __len__(self):
         return len(self.subjects)
