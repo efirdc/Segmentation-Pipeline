@@ -6,7 +6,7 @@ import torch
 import torchio as tio
 from torch import nn
 from torch.utils.data import DataLoader
-from torchio.typing import TypePatchSize
+from torchio.typing import TypeSpatialShape
 from torchio.transforms.preprocessing.label.label_transform import LabelTransform
 
 from .transforms import *
@@ -109,8 +109,8 @@ class PatchPredict(Predictor):
         self,
         image_names: Sequence[str] = ("X",),
         patch_batch_size: int = 16,
-        patch_size: TypePatchSize = None,
-        patch_overlap: TypePatchSize = (0, 0, 0),
+        patch_size: TypeSpatialShape = None,
+        patch_overlap: TypeSpatialShape = (0, 0, 0),
         padding_mode: Union[str, float, None] = None,
         overlap_mode: str = "average",
     ):
